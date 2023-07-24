@@ -1,5 +1,7 @@
 # README
 
+# TEAM DES (DAM Embedded Security)
+
 ## Running the insecure example
 
 1. Build the firmware by navigating to `firmware/firmware`, and running `make`.
