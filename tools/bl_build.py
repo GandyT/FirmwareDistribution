@@ -36,9 +36,11 @@ def generate_keys():
     rsa_private_key = rsa.export_key("PEM")
     rsa_public_key = rsa.publickey().export_key()
 
+    hmac_key = get_random_bytes(64)
+
     # write to secrets
     f = open(os.path.join(BOOTLOADER_DIR, "src/secret_build_output.txt"), "wb")
-    f.write(aes_key + rsa_private_key)
+    f.write(aes_key + rsa_private_key + hmac_key)
     f.close()
 
     # keys.h
@@ -59,7 +61,15 @@ def generate_keys():
             c_rsa_public_key += str(rsa_public_key[i]) + ", "
     c_rsa_public_key += "};"
 
-    keysFile = c_aes_key + "\n" + c_rsa_public_key
+    c_hmac_key = "uint8_t hmacKey[] = {"
+    for i in range(len(hmac_key)):
+        if i == len(hmac_key):
+            c_hmac_key += str(hmac_key[i])
+        else:
+            c_hmac_key += str(hmac_key[i]) + ", "
+    c_hmac_key += "};"
+
+    keysFile = c_aes_key + "\n" + c_rsa_public_key + "\n" + c_hmac_key
     f = open(HEADER_FILE, "w")
     f.write(keysFile)
         
