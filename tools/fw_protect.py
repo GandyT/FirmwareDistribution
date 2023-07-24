@@ -28,7 +28,7 @@ def protect_firmware(infile, outfile, version, message):
     HMAC_key = f.read(64)
     f.close()
     
-    # Pack version and size into two little-endian shorts
+    # Pack message, version and size into two little-endian shorts
     metadata = struct.pack('<HHH', message.encode(), version, len(firmware))
     
     #create an IV and hash metadata using HMAC
@@ -47,27 +47,27 @@ def protect_firmware(infile, outfile, version, message):
     protectedFirmware = cipher.encrypt(firmware)
     
     #create signatures for every 256 byte block of firmware
-    byte_num = 0
-    byte_string = b""
-    signatures = b""
+    # byte_num = 0
+    # byte_string = b""
+    # signatures = b""
     
-    for byte in firmware:
-        if byte_num % 256 == 0:
-            hasher = SHA256.new(byte_string)
-            block_signature = pkcs1_15.new(rsa_key).sign(hasher)
-            signatures += block_signature
-            byte_string = b""
-        else:
-            byte_string += byte
-            byte_num += 1
+    # for byte in firmware:
+    #     if byte_num % 256 == 0:
+    #         hasher = SHA256.new(byte_string)
+    #         block_signature = pkcs1_15.new(rsa_key).sign(hasher)
+    #         signatures += block_signature
+    #         byte_string = b""
+    #     else:
+    #         byte_string += byte
+    #         byte_num += 1
     
-    if (byte_string != b""):
-        padded = pad(byte_string, 256)
-        hasher = SHA256.new(byte_string)
-        block_signature = pkcs1_15.new(rsa_key).sign(hasher)
-        signatures += block_signature
-        
-    firmware_blob = metadata + IV + MAC_tag + signature + signatures + protectedFirmware + b'\00'
+    # if (byte_string != b""):
+    #     padded = pad(byte_string, 256)
+    #     hasher = SHA256.new(byte_string)
+    #     block_signature = pkcs1_15.new(rsa_key).sign(hasher)
+    #     signatures += block_signature
+    firmware_blob = metadata + IV + MAC_tag + signature + protectedFirmware + b'\00' 
+    # firmware_blob = metadata + IV + MAC_tag + signature + signatures + protectedFirmware + b'\00'
     # Append null-terminated message to end of firmware
     # firmware_and_message = firmware + message.encode() + b'\00' #Original
 
