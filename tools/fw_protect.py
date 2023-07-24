@@ -43,17 +43,38 @@ def protect_firmware(infile, outfile, version, message):
     signature = pkcs1_15.new(rsa_key).sign(hash_func)
     
     #Create the random IV and encrypt the firmware with AES in CBC mode
-    IV = get_random_bytes(16)
     cipher = AES.new(aes_key, AES.MODE_CBC, iv = IV)
-    protectedFile = cipher.encrypt(pre_hash)
+    protectedFirmware = cipher.encrypt(firmware)
     
+    #create signatures for every 256 byte block of firmware
+    byte_num = 0
+    byte_string = b""
+    signatures = b""
+    
+    for byte in firmware:
+        if byte_num % 256 == 0:
+            hasher = SHA256.new(byte_string)
+            block_signature = pkcs1_15.new(rsa_key).sign(hasher)
+            signatures += block_signature
+            byte_string = b""
+        else:
+            byte_string += byte
+            byte_num += 1
+    
+    if (byte_string != b""):
+        padded = pad(byte_string, 256)
+        hasher = SHA256.new(byte_string)
+        block_signature = pkcs1_15.new(rsa_key).sign(hasher)
+        signatures += block_signature
+        
+    firmware_blob = metadata + IV + MAC_tag + signature + signatures + protectedFirmware + b'\00'
     # Append null-terminated message to end of firmware
-    firmware_and_message = firmware + message.encode() + b'\00' #Original
+    # firmware_and_message = firmware + message.encode() + b'\00' #Original
 
     # metadata = struct.pack('<HH', version, len(firmware))
     
     # Append firmware and message to metadata
-    firmware_blob = metadata + firmware_and_message #Original
+    # firmware_blob = metadata + firmware_and_message #Original
 
     # Write firmware blob to outfile
     with open(outfile, 'wb+') as outfile: #Original
