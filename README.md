@@ -14,5 +14,3 @@ Ensure that BearSSL is compiled for the stellaris: `cd ~/lib/BearSSL && make CON
 
 Copyright 2023 The MITRE Corporation. ALL RIGHTS RESERVED
 Approved for public release. Distribution unlimited 23-02181-13.
-
-hi
