@@ -53,13 +53,30 @@ def generate_keys():
         else:
             c_aes_key += str(aes_key[i]) + ", "
     c_aes_key += "};"
-    c_rsa_public_key = "uint8_t rsaKey[] = {"
+
+    rsa_public_key = b"".join(rsa_public_key.split(b"\n"))
+    startKey = b"-----BEGIN PUBLIC KEY-----"
+    endKey = b"-----END PUBLIC KEY-----"
+    rsa_public_key = rsa_public_key[len(startKey):-len(endKey)]
+
+    rsa_public_exponent = rsa_public_key[256:]
+    rsa_public_key = rsa_public_key[:256]
+
+    c_rsa_public_key = "uint8_t rsaModulus[256] = {"
     for i in range(len(rsa_public_key)):
         if i == len(rsa_public_key):
             c_rsa_public_key += str(rsa_public_key[i])
         else:
             c_rsa_public_key += str(rsa_public_key[i]) + ", "
     c_rsa_public_key += "};"
+
+    c_rsa_public_exponent = "uint8_t rsaExponent[" + str(len(rsa_public_exponent)) + "] = {"
+    for i in range(len(rsa_public_exponent)):
+        if i == len(rsa_public_exponent):
+            c_rsa_public_exponent += str(rsa_public_exponent[i])
+        else:
+            c_rsa_public_exponent += str(rsa_public_exponent[i]) + ", "
+    c_rsa_public_exponent += "};"
 
     c_hmac_key = "uint8_t hmacKey[32] = {"
     for i in range(len(hmac_key)):
@@ -69,7 +86,7 @@ def generate_keys():
             c_hmac_key += str(hmac_key[i]) + ", "
     c_hmac_key += "};"
 
-    keysFile = c_aes_key + "\n" + c_rsa_public_key + "\n" + c_hmac_key
+    keysFile = c_aes_key + "\n" + c_rsa_public_key + "\n" + c_rsa_public_exponent + "\n" + c_hmac_key
     f = open(HEADER_FILE, "w")
     f.write(keysFile)
         
@@ -114,4 +131,5 @@ if __name__ == "__main__":
 
     # delete header file
     os.remove(HEADER_FILE)
+    
 
