@@ -30,7 +30,8 @@ import socket
 from util import *
 from pwn import *
 
-RESP_OK = b"\x00"
+#RESP_OK = b"\x00"
+RESP_OK = p16(3, endian = "little")
 FRAME_SIZE = 256
 
 
@@ -75,6 +76,20 @@ def send_frame(ser, frame, debug=False):
     if debug:
         print("Resp: {}".format(ord(resp)))
 
+def send_signature(ser, signature, debug=False):
+    ser.write(signature)
+
+    if debug:
+        print(signature)
+
+    time.sleep(1)
+
+    resp = ser.read(2)
+
+    if resp != RESP_OK:
+        raise RuntimeError("ERROR: Bootloader responded with {}".format(repr(resp)))
+
+    
 
 def update(ser, infile, debug):
     # Open serial port. Set baudrate to 115200. Set timeout to 2 seconds.
@@ -109,7 +124,6 @@ def update(ser, infile, debug):
     print(f"Wrote zero length frame (2 bytes)")
 
     return ser
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Firmware Update Tool")
