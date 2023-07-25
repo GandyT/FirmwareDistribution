@@ -45,7 +45,7 @@ def protect_firmware(infile, outfile, version, message):
     MAC_tag = h.digest()
     
     #create a signature for the firmware prior to encryption
-    pre_hash = firmware + metadata + IV + MAC_tag
+    pre_hash = firmware_and_message + metadata + IV + MAC_tag
     hash_func = SHA256.new(pre_hash)
     signature = pkcs1_15.new(private_key).sign(hash_func)
     

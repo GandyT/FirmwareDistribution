@@ -78,6 +78,21 @@ def send_frame(ser, frame, debug=False):
     if debug:
         print("Resp: {}".format(ord(resp)))
 
+def send_signature(ser, signature, debug=False):
+    message_type = p16(2, endian = "big")
+    ser.write(message_type + signature)
+
+    if debug:
+        print(message_size + "\n" + signature)
+
+    time.sleep(1)
+
+    resp = ser.read(2)
+
+    if resp != RESP_OK:
+        raise RuntimeError("ERROR: Bootloader responded with {}".format(repr(resp)))
+
+    
 
 def update(ser, infile, debug):
     # Open serial port. Set baudrate to 115200. Set timeout to 2 seconds.
@@ -111,8 +126,7 @@ def update(ser, infile, debug):
     print("Done writing firmware.")
 
     #send signature to bootloader
-    message_type = p16(2, endian = "big")
-    ser.write(message_type + signature)
+    send_signature(ser, signature, debug=debug)
     
     print("Done writing signature.")
     
@@ -124,7 +138,6 @@ def update(ser, infile, debug):
     print(f"Wrote zero length frame (2 bytes)")
 
     return ser
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Firmware Update Tool")
