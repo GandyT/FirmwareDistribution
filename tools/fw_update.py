@@ -30,7 +30,7 @@ import socket
 from util import *
 from pwn import *
 
-RESP_OK = p16(3, endian = "big")
+RESP_OK = p16(3, endian = "little")
 FRAME_SIZE = 256
 
 
@@ -52,7 +52,7 @@ def send_metadata(ser, metadata, debug=False):
 
     # ser.write(metadata[2:]) #temporary without bootloader
     #send complete BEGIN frame
-    message_type = p16(0, endian = "big")
+    message_type = p16(0, endian = "little")
     ser.write(message_type + metadata)
     
     # Wait for an OK from the bootloader.
@@ -79,7 +79,7 @@ def send_frame(ser, frame, debug=False):
         print("Resp: {}".format(ord(resp)))
 
 def send_signature(ser, signature, debug=False):
-    message_type = p16(2, endian = "big")
+    message_type = p16(2, endian = "little")
     ser.write(message_type + signature)
 
     if debug:
@@ -114,7 +114,7 @@ def update(ser, infile, debug):
         # frame_fmt = ">H{}s".format(length)
 
         #new frame construction with new bootloader
-        message_type = p16(1, endian = "big")
+        message_type = p16(1, endian = "little")
         frame = message_type + struct.pack(data)
         
         # Construct frame.
