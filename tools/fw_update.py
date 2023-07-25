@@ -30,13 +30,13 @@ import socket
 from util import *
 from pwn import *
 
-RESP_OK = b"\x00"
+RESP_OK = p16(3, endian = "big")
 FRAME_SIZE = 256
 
 
 def send_metadata(ser, metadata, debug=False):
-    version, size = struct.unpack_from("<HH", metadata)
-    print(f"Version: {version}\nSize: {size} bytes\n")
+    message_len, version, size = struct.unpack_from("<HHH", metadata[:6])
+    print(f"Message Length: {message_len}\nVersion: {version}\nSize: {size} bytes\n")
 
     # Handshake for update
     ser.write(b"U")
@@ -50,8 +50,11 @@ def send_metadata(ser, metadata, debug=False):
     if debug:
         print(metadata)
 
-    ser.write(metadata)
-
+    # ser.write(metadata[2:]) #temporary without bootloader
+    #send complete BEGIN frame
+    message_type = p16(0, endian = "big")
+    ser.write(message_type + metadata)
+    
     # Wait for an OK from the bootloader.
     resp = ser.read(2)
     if resp != RESP_OK:
@@ -81,26 +84,38 @@ def update(ser, infile, debug):
     with open(infile, "rb") as fp:
         firmware_blob = fp.read()
 
-    metadata = firmware_blob[:4]
-    firmware = firmware_blob[4:]
+    # print(firmware_blob)
+    metadata_IV_tag = firmware_blob[:54]
+    message_size = u16(firmware_blob[:2], endian = "little")
+    signature = firmware_blob[54: 310]
+    firmware_message = firmware_blob[310:len(firmware_blob) - message_size]
+    send_metadata(ser, metadata_IV_tag, debug=debug)
 
-    send_metadata(ser, metadata, debug=debug)
-
-    for idx, frame_start in enumerate(range(0, len(firmware), FRAME_SIZE)):
-        data = firmware[frame_start : frame_start + FRAME_SIZE]
+    for idx, frame_start in enumerate(range(0, len(firmware_message), FRAME_SIZE)):
+        data = firmware_message[frame_start : frame_start + FRAME_SIZE]
 
         # Get length of data.
-        length = len(data)
-        frame_fmt = ">H{}s".format(length)
+        # length = len(data)
+        # frame_fmt = ">H{}s".format(length)
 
+        #new frame construction with new bootloader
+        message_type = p16(1, endian = "big")
+        frame = message_type + struct.pack(data)
+        
         # Construct frame.
-        frame = struct.pack(frame_fmt, length, data)
+        # frame = struct.pack(frame_fmt, length, data)
 
         send_frame(ser, frame, debug=debug)
         print(f"Wrote frame {idx} ({len(frame)} bytes)")
 
     print("Done writing firmware.")
 
+    #send signature to bootloader
+    message_type = p16(2, endian = "big")
+    ser.write(message_type + signature)
+    
+    print("Done writing signature.")
+    
     # Send a zero length payload to tell the bootlader to finish writing it's page.
     ser.write(struct.pack(">H", 0x0000))
     resp = ser.read(2)  # Wait for an OK from the bootloader
