@@ -9,25 +9,59 @@ Firmware Bundle-and-Protect Tool
 """
 import argparse
 import struct
-
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+from pwn import *
+from Crypto.Random import get_random_bytes
+from Crypto.Hash import HMAC, SHA256
+from Crypto.PublicKey import RSA
+from Crypto.Signature import pkcs1_15
 
 def protect_firmware(infile, outfile, version, message):
     # Load firmware binary from infile
     with open(infile, 'rb') as fp:
         firmware = fp.read()
+    
+    # pad firmware
+    firmware = pad(firmware, AES.block_size)
 
-    # Append null-terminated message to end of firmware
-    firmware_and_message = firmware + message.encode() + b'\00'
+    #obtain key from secret_build_output.txt
+    f = open("../bootloader/src/secret_build_output.txt", "rb")
+    aes_key = f.read(16)
+    HMAC_key = f.read(32)
+    rsa_key = f.read()
 
-    # Pack version and size into two little-endian shorts
-    metadata = struct.pack('<HH', version, len(firmware))
+    f.close()
 
-    # Append firmware and message to metadata
-    firmware_blob = metadata + firmware_and_message
+    private_key = RSA.import_key(rsa_key)
+    
+    # Pack message, version and size into two little-endian shorts
+
+    firmware_and_message = firmware + message.encode()
+
+    metadata = struct.pack('<HHH', len(message.encode()), version, len(firmware))
+    
+    #create an IV and hash metadata using HMAC
+    IV = get_random_bytes(16)
+    
+    h = HMAC.new(HMAC_key, metadata + IV, digestmod = SHA256)
+    MAC_tag = h.digest()
+    
+    #create a signature for the firmware prior to encryption
+    pre_hash = firmware + metadata + IV + MAC_tag
+    hash_func = SHA256.new(pre_hash)
+    signature = pkcs1_15.new(private_key).sign(hash_func)
+    
+    #Create the random IV and encrypt the firmware with AES in CBC mode
+    cipher = AES.new(aes_key, AES.MODE_CBC, iv = IV)
+
+    protectedFirmware = cipher.encrypt(firmware)
+    
+    firmware_blob = metadata + IV + MAC_tag + signature + protectedFirmware + b'\00' 
 
     # Write firmware blob to outfile
-    with open(outfile, 'wb+') as outfile:
-        outfile.write(firmware_blob)
+    with open(outfile, 'wb+') as outfile: #Original
+        outfile.write(firmware_blob) #Original
 
 
 if __name__ == '__main__':
