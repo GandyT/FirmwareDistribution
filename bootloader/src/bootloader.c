@@ -18,6 +18,9 @@
 // Application Imports
 #include "uart.h"
 
+// includes header file that is created at compile time
+#include "keys.h"
+
 // Forward Declarations
 void load_initial_firmware(void);
 void load_firmware(void);
