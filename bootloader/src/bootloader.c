@@ -14,6 +14,7 @@
 
 // Library Imports
 #include <string.h>
+#include <bearssl.h>
 
 // Application Imports
 #include "uart.h"
@@ -112,6 +113,10 @@ void load_initial_firmware(void){
     uint16_t msg_len = strlen(initial_msg) + 1;
     uint16_t rem_msg_bytes;
 
+    /* 
+    
+    */
+
     // Get included initial firmware
     int size = (int)&_binary_firmware_bin_size;
     uint8_t *initial_data = (uint8_t *)&_binary_firmware_bin_start;
@@ -166,12 +171,36 @@ void load_initial_firmware(void){
 void load_firmware(void){
     int frame_length = 0;
     int read = 0;
+
     uint32_t rcv = 0;
 
     uint32_t data_index = 0;
     uint32_t page_addr = FW_BASE;
     uint32_t version = 0;
     uint32_t size = 0;
+
+    /* GET MSG TYPE (0x2 bytes)*/
+    /* CHECK IF MSG TYPE IS 0 */
+    /* GET FW_VERSION (0x2 bytes) */
+    /* GET FW_SIZE (0x2 bytes) */
+    /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
+    /* GET IV (0x10 bytes) */
+    /* GET HMAC TAG (0x20 bytes) */
+    /* VERIFY HMAC TAG */
+
+    /* WAIT FOR MESSAGE TYPE 1 */
+    /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
+    /* DECRYPT DATA WTIH AES AND IV */
+
+    /* WAIT FOR MESSAGE TYPE 2 (RSA SIG) */
+    /* READ 256 BYTES RSA SIGNATURE */
+
+    /* ATTEMPT TO VERIFY INTEGRITY OF SIGNATURE  */
+    /* 
+    Signature generated with:
+    ([firmware with releasemsg] + rm_size + version + fw_size + IV + HMAC tag)
+    */
+
 
     // Get version as 16 bytes 
     rcv = uart_read(UART1, BLOCKING, &read);
