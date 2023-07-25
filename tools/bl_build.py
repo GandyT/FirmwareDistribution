@@ -46,14 +46,14 @@ def generate_keys():
     # keys.h
     # aes key
     # rsa_public key
-    c_aes_key = "uint8_t aesKey[] = {"
+    c_aes_key = "uint8_t aesKey[16] = {"
     for i in range(len(aes_key)):
         if i == len(aes_key) - 1:
             c_aes_key += str(aes_key[i])
         else:
             c_aes_key += str(aes_key[i]) + ", "
     c_aes_key += "};"
-    c_rsa_public_key = "uint8_t rsaKey[] = {"
+    c_rsa_public_key = "uint8_t rsaKey[256] = {"
     for i in range(len(rsa_public_key)):
         if i == len(rsa_public_key):
             c_rsa_public_key += str(rsa_public_key[i])
@@ -61,7 +61,7 @@ def generate_keys():
             c_rsa_public_key += str(rsa_public_key[i]) + ", "
     c_rsa_public_key += "};"
 
-    c_hmac_key = "uint8_t hmacKey[] = {"
+    c_hmac_key = "uint8_t hmacKey[32] = {"
     for i in range(len(hmac_key)):
         if i == len(hmac_key):
             c_hmac_key += str(hmac_key[i])
