@@ -15,9 +15,64 @@ import pathlib
 import shutil
 import subprocess
 
+from Crypto.Random import get_random_bytes
+from Crypto.PublicKey import RSA
+
 REPO_ROOT = pathlib.Path(__file__).parent.parent.absolute()
 BOOTLOADER_DIR = os.path.join(REPO_ROOT, "bootloader")
 
+HEADER_FILE = os.path.join(BOOTLOADER_DIR, "src/keys.h")
+
+# generates 
+# secret file
+# aes key
+# rsa private key
+
+def generate_keys():
+    aes_key = get_random_bytes(16)
+
+    rsa = RSA.generate(2048)
+
+    rsa_private_key = rsa.export_key("PEM")
+    rsa_public_key = rsa.publickey().export_key()
+
+    hmac_key = get_random_bytes(32)
+
+    # write to secrets
+    f = open(os.path.join(BOOTLOADER_DIR, "src/secret_build_output.txt"), "wb")
+    f.write(aes_key + hmac_key + rsa_private_key)
+    f.close()
+
+    # keys.h
+    # aes key
+    # rsa_public key
+    c_aes_key = "uint8_t aesKey[16] = {"
+    for i in range(len(aes_key)):
+        if i == len(aes_key) - 1:
+            c_aes_key += str(aes_key[i])
+        else:
+            c_aes_key += str(aes_key[i]) + ", "
+    c_aes_key += "};"
+    c_rsa_public_key = "uint8_t rsaKey[] = {"
+    for i in range(len(rsa_public_key)):
+        if i == len(rsa_public_key):
+            c_rsa_public_key += str(rsa_public_key[i])
+        else:
+            c_rsa_public_key += str(rsa_public_key[i]) + ", "
+    c_rsa_public_key += "};"
+
+    c_hmac_key = "uint8_t hmacKey[32] = {"
+    for i in range(len(hmac_key)):
+        if i == len(hmac_key):
+            c_hmac_key += str(hmac_key[i])
+        else:
+            c_hmac_key += str(hmac_key[i]) + ", "
+    c_hmac_key += "};"
+
+    keysFile = c_aes_key + "\n" + c_rsa_public_key + "\n" + c_hmac_key
+    f = open(HEADER_FILE, "w")
+    f.write(keysFile)
+        
 
 def copy_initial_firmware(binary_path: str):
     # Copy the initial firmware binary to the bootloader build directory
@@ -54,4 +109,9 @@ if __name__ == "__main__":
         )
 
     copy_initial_firmware(firmware_path)
+    generate_keys()
     make_bootloader()
+
+    # delete header file
+    os.remove(HEADER_FILE)
+
