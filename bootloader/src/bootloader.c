@@ -180,12 +180,26 @@ void load_firmware(void){
     uint32_t size = 0;
 
     /* GET MSG TYPE (0x2 bytes)*/
+    /* CHECK IF MSG TYPE IS 0 */
     /* GET FW_VERSION (0x2 bytes) */
     /* GET FW_SIZE (0x2 bytes) */
     /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
     /* GET IV (0x10 bytes) */
     /* GET HMAC TAG (0x20 bytes) */
     /* VERIFY HMAC TAG */
+
+    /* WAIT FOR MESSAGE TYPE 1 */
+    /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
+    /* DECRYPT DATA WTIH AES AND IV */
+
+    /* WAIT FOR MESSAGE TYPE 2 (RSA SIG) */
+    /* READ 256 BYTES RSA SIGNATURE */
+
+    /* ATTEMPT TO VERIFY INTEGRITY OF SIGNATURE  */
+    /* 
+    Signature generated with:
+    ([firmware with releasemsg] + rm_size + version + fw_size + IV + HMAC tag)
+    */
 
 
     // Get version as 16 bytes 
