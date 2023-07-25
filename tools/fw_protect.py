@@ -21,9 +21,6 @@ def protect_firmware(infile, outfile, version, message):
     # Load firmware binary from infile
     with open(infile, 'rb') as fp:
         firmware = fp.read()
-    
-    # pad firmware
-    firmware = pad(firmware, AES.block_size)
 
     #obtain key from secret_build_output.txt
     f = open("../bootloader/src/secret_build_output.txt", "rb")
@@ -37,7 +34,7 @@ def protect_firmware(infile, outfile, version, message):
     
     # Pack message, version and size into two little-endian shorts
 
-    firmware_and_message = firmware + message.encode()
+    firmware_and_message = pad(firmware + message.encode(), AES.block_size)
 
     metadata = struct.pack('<HHH', len(message.encode()), version, len(firmware))
     
@@ -55,14 +52,13 @@ def protect_firmware(infile, outfile, version, message):
     #Create the random IV and encrypt the firmware with AES in CBC mode
     cipher = AES.new(aes_key, AES.MODE_CBC, iv = IV)
 
-    protectedFirmware = cipher.encrypt(firmware)
+    protectedFirmware = cipher.encrypt(firmware_and_message)
     
     firmware_blob = metadata + IV + MAC_tag + signature + protectedFirmware + b'\00' 
 
     # Write firmware blob to outfile
     with open(outfile, 'wb+') as outfile: #Original
         outfile.write(firmware_blob) #Original
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Firmware Update Tool')
