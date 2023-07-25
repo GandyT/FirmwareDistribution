@@ -61,7 +61,7 @@ def generate_keys():
             c_rsa_public_key += str(rsa_public_key[i]) + ", "
     c_rsa_public_key += "};"
 
-    c_hmac_key = "uint8_t hmacKey[64] = {"
+    c_hmac_key = "uint8_t hmacKey[32] = {"
     for i in range(len(hmac_key)):
         if i == len(hmac_key):
             c_hmac_key += str(hmac_key[i])
