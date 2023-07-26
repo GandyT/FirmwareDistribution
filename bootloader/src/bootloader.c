@@ -37,10 +37,11 @@ long program_flash(uint32_t, unsigned char *, unsigned int);
 #define FLASH_WRITESIZE 4
 
 // Protocol Constants
-#define METADATA ((unsigned char)0x00)
-#define MESSAGE ((unsigned char) 0x01)
-#define SIGNATURE ((unsigned char) 0x02)
-#define OK ((unsigned char)0x03)
+#define METADATA ((uint16_t)0x00)
+#define MESSAGE ((uint16_t) 0x01)
+#define SIGNATURE ((uint16_t) 0x02)
+#define OK ((uint16_t)0x03)
+#define ERROR ((uint16_t) 0x04)
 
 #define UPDATE ((unsigned char)'U')
 #define BOOT ((unsigned char)'B')
@@ -224,16 +225,16 @@ void load_firmware(void){
 
     // Write new firmware size and version to Flash
     // Create 32 bit word for flash programming, version is at lower address, size is at higher address
-    uint32_t metadata = ((size & 0xFFFF) << 16) | (version & 0xFFFF);
+    uint32_t metadata = ((fw_size & 0xFFFF) << 16) | (version & 0xFFFF);
     program_flash(METADATA_BASE, (uint8_t *)(&metadata), 4);
 
     uart_write(UART1, OK); // Acknowledge the metadata.
 
     /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
     rcv = uart_read(UART1, BLOCKING, &read);
-    release_msg_size = (uint32_t)rcv;
+    rm_size = (uint32_t)rcv;
     rcv = uart_read(UART1, BLOCKING, &read);
-    release_msg_size |= (uint32_t)rcv << 8;
+    rm_size |= (uint32_t)rcv << 8;
 
     /* GET IV (0x10 bytes) */
     for (int i = 0; i < 10; i++) {
@@ -248,7 +249,7 @@ void load_firmware(void){
     }
     
     /* VERIFY HMAC TAG */
-    hmac_verified = verify_hmac(hmac_tag, firmware_data, fw_size);
+    // hmac_verified = verify_hmac(hmac_tag, firmware_data, fw_size);
 
     /* WAIT FOR MESSAGE TYPE 1 */
     rcv = uart_read(UART1, BLOCKING, &read);
