@@ -111,6 +111,8 @@ def update(ser, infile, debug):
 
         # Get length of data.
         # length = len(data)
+        if len(data) < 256:
+            data = pad(data, 256)
         # frame_fmt = ">H{}s".format(length)
 
         #new frame construction with new bootloader
