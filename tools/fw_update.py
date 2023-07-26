@@ -120,13 +120,16 @@ def update(ser, infile, debug):
 
         # Get length of data.
         # length = len(data)
-        if len(data) < 256:
-            data = pad(data, 256)
-        frame_fmt = ">H{}s".format(256)
+        if len(data) < FRAME_SIZE:
+            data = pad(data, FRAME_SIZE)
+        frame_fmt = ">H{}s".format(FRAME_SIZE)
 
         #new frame construction with new bootloader
+        packed_data = struct.pack(frame_fmt, data)
+        print(len(packed_data))
         
-        frame = RESP_MESSAGE + struct.pack(frame_fmt, 256, data)
+        frame = RESP_MESSAGE + packed_data
+        
 
         send_frame(ser, frame, debug=debug)
         print(f"Wrote frame {idx} ({len(frame)} bytes)")
