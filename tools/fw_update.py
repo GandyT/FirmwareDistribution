@@ -83,7 +83,7 @@ def send_signature(ser, signature, debug=False):
     ser.write(message_type + signature)
 
     if debug:
-        print(message_size + "\n" + signature)
+        print(message_type + "\n" + signature)
 
     resp = ser.read(2)
 
