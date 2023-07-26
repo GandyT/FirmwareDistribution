@@ -218,7 +218,6 @@ void load_firmware(void){
     
 
     /* GET IV (0x10 bytes) */
-    /**/
 
 
     /* GET HMAC TAG (0x20 bytes) */
