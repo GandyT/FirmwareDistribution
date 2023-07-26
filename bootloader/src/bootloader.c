@@ -180,7 +180,14 @@ void load_firmware(void){
     uint32_t size = 0;
 
     /* GET MSG TYPE (0x2 bytes)*/
+    uint8_t msg_type = uart_read(UART1, BLOCKING, &read);
+    uart_write_str(UART2, "Received Message Type: ");
+    uart_write_hex(UART2, version);
+    nl(UART2);
+
     /* CHECK IF MSG TYPE IS 0 */
+    if (msg_type != 0) return;
+
     /* GET FW_VERSION (0x2 bytes) */
     /* GET FW_SIZE (0x2 bytes) */
     /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
