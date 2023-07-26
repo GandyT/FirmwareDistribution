@@ -210,11 +210,15 @@ void load_firmware(void){
         return;
     }
 
-    /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
+    /* GET FW_SIZE (0x2 bytes) */
     rcv = uart_read(UART1, BLOCKING, &read);
-    rm_size = (uint32_t)rcv;
+    fw_size = (uint32_t)rcv;
     rcv = uart_read(UART1, BLOCKING, &read);
-    rm_size |= (uint32_t)rcv << 8;
+    fw_size |= (uint32_t)rcv << 8;
+
+    uart_write_str(UART2, "Received Firmware Size: ");
+    uart_write_hex(UART2, fw_size);
+    nl(UART2);
 
     /* GET FW_VERSION (0x2 bytes) */
     rcv = uart_read(UART1, BLOCKING, &read);
@@ -226,14 +230,18 @@ void load_firmware(void){
     uart_write_hex(UART2, version);
     nl(UART2);
 
-    /* GET FW_SIZE (0x2 bytes) */
-    rcv = uart_read(UART1, BLOCKING, &read);
-    fw_size = (uint32_t)rcv;
-    rcv = uart_read(UART1, BLOCKING, &read);
-    fw_size |= (uint32_t)rcv << 8;
-
     uint8_t fw_buffer[fw_size];
     int fw_buffer_index = 0;
+
+    /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
+    rcv = uart_read(UART1, BLOCKING, &read);
+    rm_size = (uint32_t)rcv;
+    rcv = uart_read(UART1, BLOCKING, &read);
+    rm_size |= (uint32_t)rcv << 8;
+
+    uart_write_str(UART2, "Received Release Message Size: ");
+    uart_write_hex(UART2, rm_size);
+    nl(UART2);
 
     // Write new firmware size and version to Flash
     // Create 32 bit word for flash programming, version is at lower address, size is at higher address
@@ -243,28 +251,19 @@ void load_firmware(void){
     uart_write(UART1, OK);
 
     /* GET IV (0x10 bytes) */
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 0x10; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
         iv[i] = (uint8_t)rcv;
     }
 
     /* GET HMAC TAG (0x20 bytes) */
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < 0x20; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
         hmac_tag[i] = (uint8_t)rcv;
     }
     
     /* VERIFY HMAC TAG */
     // hmac_verified = verify_hmac(hmac_tag, firmware_data, fw_size);
-
-    /* READ 256 BYTES RSA SIGNATURE */
-    uint8_t rsa_signature[256];
-    for (int i = 0; i < 256; i++) {
-        rcv = uart_read(UART1, BLOCKING, &read);
-        rsa_signature[i] = (uint8_t)rcv;
-    }
-    uart_write_str(UART2, "Received RSA Signature: ");
-    nl(UART2);
 
     /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
     for (int i = 0; i < 256; ++i) {
@@ -281,15 +280,6 @@ void load_firmware(void){
             return;
         }
 
-        rcv = uart_read(UART1, BLOCKING, &read);
-        frame_length = (int)rcv << 8;
-        rcv = uart_read(UART1, BLOCKING, &read);
-        frame_length += (int)rcv;
-
-        // Write length debug message
-        uart_write_hex(UART2, frame_length);
-        nl(UART2);
-
         for (int i = 0; i < frame_length; ++i) {
             fw_buffer[fw_buffer_index] = uart_read(UART1, BLOCKING, &read);
             fw_buffer_index += 1;
@@ -297,12 +287,6 @@ void load_firmware(void){
 
         uart_write(UART1, OK);
     }
-       
-    size_t data_len = sizeof(fw_buffer);
-
-    aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, data_len);
-
-    // REMOVE PADDING
 
     /* WAIT FOR MESSAGE TYPE 2 (RSA SIG) */
     rcv = uart_read(UART1, BLOCKING, &read);
@@ -316,6 +300,21 @@ void load_firmware(void){
         reject();
         return;
     }
+
+    /* READ 256 BYTES RSA SIGNATURE */
+    uint8_t rsa_signature[256];
+    for (int i = 0; i < 256; i++) {
+        rcv = uart_read(UART1, BLOCKING, &read);
+        rsa_signature[i] = (uint8_t)rcv;
+    }
+    uart_write_str(UART2, "Received RSA Signature: ");
+    nl(UART2);
+       
+    size_t data_len = sizeof(fw_buffer);
+
+    aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, data_len);
+
+    /* REMOVE PADDING */
 
     /* ATTEMPT TO VERIFY INTEGRITY OF SIGNATURE  */
     /* 

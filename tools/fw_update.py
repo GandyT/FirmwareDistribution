@@ -30,15 +30,18 @@ import socket
 from util import *
 from pwn import *
 
+from Crypto.Util.Padding import pad
+
 RESP_METADATA = p8(0, endian="little")
 RESP_MESSAGE = p8(1, endian="little")
 RESP_SIGNATURE = p8(2, endian="little")
 RESP_OK = p8(3, endian="little")
+ZERO_BYTE = p8(0, endian="little")
 FRAME_SIZE = 256
 
 def send_metadata(ser, metadata, debug=False):
-    message_len, version, size = struct.unpack_from("<HHH", metadata[:6])
-    print(f"Message Length: {message_len}\nVersion: {version}\nSize: {size} bytes\n")
+    fw_size, version, rm_size = struct.unpack_from("<HHH", metadata[:6])
+    print(f"fw_size: {fw_size}\nVersion: {version}\nrm_size: {rm_size} bytes\n")
 
     # Handshake for update
     ser.write(b"U")
@@ -55,7 +58,7 @@ def send_metadata(ser, metadata, debug=False):
     # ser.write(metadata[2:]) #temporary without bootloader
     #send complete BEGIN frame
     message_type = RESP_METADATA
-    print(len(metadata))
+
     ser.write(message_type + metadata)
     
     # Wait for an OK from the bootloader.
@@ -106,9 +109,10 @@ def update(ser, infile, debug):
 
     # print(firmware_blob)
     metadata_IV_tag = firmware_blob[:54]
-    message_size = u16(firmware_blob[:2], endian = "little")
+    rm_size = u16(firmware_blob[4:6], endian = "little")
     signature = firmware_blob[54: 310]
-    firmware_message = firmware_blob[310:len(firmware_blob) - message_size]
+
+    firmware_message = firmware_blob[310:]
     send_metadata(ser, metadata_IV_tag, debug=debug)
 
     for idx, frame_start in enumerate(range(0, len(firmware_message), FRAME_SIZE)):
@@ -121,8 +125,8 @@ def update(ser, infile, debug):
         frame_fmt = ">H{}s".format(256)
 
         #new frame construction with new bootloader
-        message_type = p16(1, endian = "little")
-        frame = message_type + struct.pack(frame_fmt, 256, data)
+        
+        frame = RESP_MESSAGE + struct.pack(frame_fmt, 256, data)
 
         send_frame(ser, frame, debug=debug)
         print(f"Wrote frame {idx} ({len(frame)} bytes)")
