@@ -173,12 +173,22 @@ void load_initial_firmware(void){
  * Load the firmware into flash.
  */
 
+ // write the code in two bytes
+void write_code(uint16_t code) {
+    uint8_t byte1 = (uint8_t) (code & 0xFF);
+    uint8_t byte2 = (uint8_t) (code << 8);
+    uart_write(UART1, byte1);
+    uart_write(UART1, byte2);
+}
+
 // Returning the function is not a valid reject, needs to send error
 void reject() {
     uart_write(UART1, ERROR); // Reject the data
     SysCtlReset(); // Reset device
     return;
 }
+
+
 
 void load_firmware(void){
     int frame_length = 0;
@@ -238,7 +248,7 @@ void load_firmware(void){
     uint32_t metadata = ((fw_size & 0xFFFF) << 16) | (version & 0xFFFF);
     program_flash(METADATA_BASE, (uint8_t *)(&metadata), 4);
 
-    uart_write(UART1, OK); // Acknowledge the metadata.
+    write_code(OK);
 
     /* GET IV (0x10 bytes) */
     for (int i = 0; i < 10; i++) {
@@ -290,6 +300,7 @@ void load_firmware(void){
        
     /* DECRYPT DATA WTIH AES AND IV */
 
+    /*
     size_t data_len = sizeof(data);
     br_ssl_client_context init_context;
     br_ssl_client_init_full(&init_context, NULL, 0);
@@ -302,6 +313,7 @@ void load_firmware(void){
     //this sets the value of data to be decrypted
     br_aes_big_cbcdec_run(&dec_context, iv, data, data_len);
     //memcpy(&decrypted_data, data, data_len);
+    */
 
     /* WAIT FOR MESSAGE TYPE 2 (RSA SIG) */
     rcv = uart_read(UART1, BLOCKING, &read);
