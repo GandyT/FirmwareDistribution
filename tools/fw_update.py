@@ -30,10 +30,9 @@ import socket
 from util import *
 from pwn import *
 
-RESP_OK = p16(3, endian = "little")
+RESP_OK = p8(3, endian = "little")
 FRAME_SIZE = 256
 
-print(RESP_OK)
 def send_metadata(ser, metadata, debug=False):
     message_len, version, size = struct.unpack_from("<HHH", metadata[:6])
     print(f"Message Length: {message_len}\nVersion: {version}\nSize: {size} bytes\n")
@@ -57,7 +56,8 @@ def send_metadata(ser, metadata, debug=False):
     
     # Wait for an OK from the bootloader.
     resp = ser.read(2)
-
+    
+    time.sleep(0.1)
     
     if resp != RESP_OK:
         raise RuntimeError("ERROR: Bootloader responded with {}".format(repr(resp)))

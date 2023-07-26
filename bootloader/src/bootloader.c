@@ -37,11 +37,11 @@ long program_flash(uint32_t, unsigned char *, unsigned int);
 #define FLASH_WRITESIZE 4
 
 // Protocol Constants
-#define METADATA ((uint16_t)0x00)
-#define MESSAGE ((uint16_t) 0x01)
-#define SIGNATURE ((uint16_t) 0x02)
-#define OK ((uint16_t)0x03)
-#define ERROR ((uint16_t) 0x04)
+#define METADATA ((unsigned char)0x00)
+#define MESSAGE ((unsigned char) 0x01)
+#define SIGNATURE ((unsigned char) 0x02)
+#define OK ((unsigned char) 0x03)
+#define ERROR ((unsigned char) 0x04)
 
 #define UPDATE ((unsigned char)'U')
 #define BOOT ((unsigned char)'B')
@@ -173,22 +173,12 @@ void load_initial_firmware(void){
  * Load the firmware into flash.
  */
 
- // write the code in two bytes
-void write_code(uint16_t code) {
-    uint8_t byte1 = (uint8_t) (code & 0xFF);
-    uint8_t byte2 = (uint8_t) (code << 8);
-    uart_write(UART1, byte1);
-    uart_write(UART1, byte2);
-}
-
 // Returning the function is not a valid reject, needs to send error
 void reject() {
-    uart_write(UART1, ERROR); // Reject the data
+    uart_write(UART1, ERROR);
     SysCtlReset(); // Reset device
     return;
 }
-
-
 
 void load_firmware(void){
     int frame_length = 0;
@@ -248,7 +238,7 @@ void load_firmware(void){
     uint32_t metadata = ((fw_size & 0xFFFF) << 16) | (version & 0xFFFF);
     program_flash(METADATA_BASE, (uint8_t *)(&metadata), 4);
 
-    write_code(OK);
+    uart_write(UART1, OK);
 
     /* GET IV (0x10 bytes) */
     for (int i = 0; i < 10; i++) {
