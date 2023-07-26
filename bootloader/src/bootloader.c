@@ -176,11 +176,13 @@ void load_firmware(void){
 
     uint32_t data_index = 0;
     uint32_t page_addr = FW_BASE;
-    uint32_t version = 0;
-    uint32_t size = 0;
+    uint32_t version = 0; // firmware version
+    uint32_t fw_size = 0; // size of firmware
+    uint32_t rm_size = 0; // size of release message
+    uint16_t iv[10]; // initialization vector for AES
 
     /* GET MSG TYPE (0x2 bytes)*/
-    uint8_t msg_type = uart_read(UART1, BLOCKING, &read);
+    uint16_t msg_type = uart_read(UART1, BLOCKING, &read);
     uart_write_str(UART2, "Received Message Type: ");
     uart_write_hex(UART2, version);
     nl(UART2);
@@ -189,36 +191,6 @@ void load_firmware(void){
     if (msg_type != 0) return;
 
     /* GET FW_VERSION (0x2 bytes) */
-    uint16_t fw_version = uart_read(UART1, BLCOKING, &version);
-    uart_write_str(UART2, "Received fw version: ");
-    uart_write_hex(UART2, version);
-    nl(UART2);
-   
-    /* GET FW_SIZE (0x2 bytes) */
-    uint16_t fw_size;
-
-    /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
-    uint16_t release_msg_size; 
-    /* GET IV (0x10 bytes) */
-
-    /* GET HMAC TAG (0x20 bytes) */
-    /* VERIFY HMAC TAG */
-
-    /* WAIT FOR MESSAGE TYPE 1 */
-    /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
-    /* DECRYPT DATA WTIH AES AND IV */
-
-    /* WAIT FOR MESSAGE TYPE 2 (RSA SIG) */
-    /* READ 256 BYTES RSA SIGNATURE */
-
-    /* ATTEMPT TO VERIFY INTEGRITY OF SIGNATURE  */
-    /* 
-    Signature generated with:
-    ([firmware with releasemsg] + rm_size + version + fw_size + IV + HMAC tag)
-    */
-
-
-    // Get version as 16 bytes 
     rcv = uart_read(UART1, BLOCKING, &read);
     version = (uint32_t)rcv;
     rcv = uart_read(UART1, BLOCKING, &read);
@@ -228,11 +200,56 @@ void load_firmware(void){
     uart_write_hex(UART2, version);
     nl(UART2);
 
-    // Get size as 16 bytes 
+    /* GET FW_SIZE (0x2 bytes) */
     rcv = uart_read(UART1, BLOCKING, &read);
-    size = (uint32_t)rcv;
+    fw_size = (uint32_t)rcv;
     rcv = uart_read(UART1, BLOCKING, &read);
-    size |= (uint32_t)rcv << 8;
+    fw_size |= (uint32_t)rcv << 8;
+
+    /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
+    rcv = uart_read(UART1, BLOCKING, &read);
+    release_msg_size = (uint32_t)rcv;
+    rcv = uart_read(UART1, BLOCKING, &read);
+    release_msg_size |= (uint32_t)rcv << 8;
+
+    /* GET IV (0x10 bytes) */
+    for (int i = 0; i < 10; i++) {
+        rcv = uart_read(UART1, BLOCKING, &read);
+        iv[i] = (uint16_t)rcv;
+        rcv = uart_read(UART1, BLOCKING, &read);
+        iv[i] |= (uint16_t)rcv << 8;
+    }
+
+    /* GET HMAC TAG (0x20 bytes) */
+    uint8_t hmac_tag[32];
+    for (int i = 0; i < 32; i++) {
+        rcv = uart_read(UART1, BLOCKING, &read);
+        hmac_tag[i] = (uint8_t)rcv;
+    }
+    /* VERIFY HMAC TAG */
+    hmac_verified = verify_hmac(hmac_tag, firmware_data, fw_size);
+
+    /* WAIT FOR MESSAGE TYPE 1 */
+    uint16_t msg_type_1 = 0;
+    while (msg_type_1 != 1) {
+        msg_type_1 = uart_read(UART1, BLOCKING, &read);
+    }
+
+    /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
+       
+
+    /* DECRYPT DATA WTIH AES AND IV */
+
+
+
+    /* WAIT FOR MESSAGE TYPE 2 (RSA SIG) */
+    /* READ 256 BYTES RSA SIGNATURE */
+
+    /* ATTEMPT TO VERIFY INTEGRITY OF SIGNATURE  */
+    /* 
+    Signature generated with:
+    ([firmware with releasemsg] + rm_size + version + fw_size + IV + HMAC tag)
+    */
 
     uart_write_str(UART2, "Received Firmware Size: ");
     uart_write_hex(UART2, size);
