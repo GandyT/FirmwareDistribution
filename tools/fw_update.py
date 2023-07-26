@@ -28,8 +28,10 @@ import time
 import socket
 
 from util import *
+from pwn import *
 
-RESP_OK = b"\x00"
+#RESP_OK = b"\x00"
+RESP_OK = p16(3, endian = "little")
 FRAME_SIZE = 256
 
 
@@ -52,7 +54,7 @@ def send_metadata(ser, metadata, debug=False):
     ser.write(metadata)
 
     # Wait for an OK from the bootloader.
-    resp = ser.read(1)
+    resp = ser.read(2)
     if resp != RESP_OK:
         raise RuntimeError("ERROR: Bootloader responded with {}".format(repr(resp)))
 
@@ -63,7 +65,8 @@ def send_frame(ser, frame, debug=False):
     if debug:
         print_hex(frame)
 
-    resp = ser.read(1)  # Wait for an OK from the bootloader
+    #ok message is a little endian short so should be 2 bytes
+    resp = ser.read(2)  # Wait for an OK from the bootloader
 
     time.sleep(0.1)
 
@@ -73,6 +76,20 @@ def send_frame(ser, frame, debug=False):
     if debug:
         print("Resp: {}".format(ord(resp)))
 
+def send_signature(ser, signature, debug=False):
+    ser.write(signature)
+
+    if debug:
+        print(signature)
+
+    time.sleep(1)
+
+    resp = ser.read(2)
+
+    if resp != RESP_OK:
+        raise RuntimeError("ERROR: Bootloader responded with {}".format(repr(resp)))
+
+    
 
 def update(ser, infile, debug):
     # Open serial port. Set baudrate to 115200. Set timeout to 2 seconds.
@@ -101,13 +118,12 @@ def update(ser, infile, debug):
 
     # Send a zero length payload to tell the bootlader to finish writing it's page.
     ser.write(struct.pack(">H", 0x0000))
-    resp = ser.read(1)  # Wait for an OK from the bootloader
+    resp = ser.read(2)  # Wait for an OK from the bootloader
     if resp != RESP_OK:
         raise RuntimeError("ERROR: Bootloader responded to zero length frame with {}".format(repr(resp)))
     print(f"Wrote zero length frame (2 bytes)")
 
     return ser
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Firmware Update Tool")
