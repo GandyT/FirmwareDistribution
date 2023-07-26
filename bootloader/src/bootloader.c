@@ -296,7 +296,18 @@ void load_firmware(void){
        
     /* DECRYPT DATA WTIH AES AND IV */
 
-    
+    size_t data_len = sizeof(data);
+    br_ssl_client_context init_context;
+    br_ssl_client_init_full(&init_context, NULL, 0);
+
+    br_aes_gen_cbcdec_keys dec_context;
+    br_aes_big_bcbdec_init(&dec_context, aesKey, sizeof(aesKey));
+
+    //char decrypted_data[data_len];
+
+    //this sets the value of data to be decrypted
+    br_aes_big_cbcdec_run(&dec_context, iv, data, data_len);
+    //memcpy(&decrypted_data, data, data_len);
 
     /* WAIT FOR MESSAGE TYPE 2 (RSA SIG) */
     rcv = uart_read(UART1, BLOCKING, &read);
