@@ -168,6 +168,7 @@ void load_initial_firmware(void){
 /*
  * Load the firmware into flash.
  */
+
 void load_firmware(void){
     int frame_length = 0;
     int read = 0;
@@ -180,6 +181,8 @@ void load_firmware(void){
     uint32_t fw_size = 0; // size of firmware
     uint32_t rm_size = 0; // size of release message
     uint16_t iv[10]; // initialization vector for AES
+    uint8_t hmac_tag[32]; //hmac_tag 
+    uint8_t data[256];
 
     /* GET MSG TYPE (0x2 bytes)*/
     rcv = uart_read(UART1, BLOCKING, &read);
@@ -230,7 +233,6 @@ void load_firmware(void){
     }
 
     /* GET HMAC TAG (0x20 bytes) */
-    uint8_t hmac_tag[32];
     for (int i = 0; i < 32; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
         hmac_tag[i] = (uint8_t)rcv;
@@ -246,11 +248,38 @@ void load_firmware(void){
     }
 
     /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
+    while (1) {
+        rcv = uart_read(UART1, BLOCKING, &read);
+        frame_length = (int)rcv << 8;
+        rcv = uart_read(UART1, BLOCKING, &read);
+        frame_length += (int)rcv;
+
+        for (int i = 0; i < frame_length; ++i) {
+            data[data_index] = uart_read(UART1, BLOCKING, &read);
+            data_index += 1;
+        }
+
+        uart_write(UART1, OK);
+    }
        
     /* DECRYPT DATA WTIH AES AND IV */
 
+
+
     /* WAIT FOR MESSAGE TYPE 2 (RSA SIG) */
+    uint16_t msg_type_2 = 0;
+    while(msg_type_2 != 2) {
+        msg_type_2 = uart_read(UART1, BLOCKING, &read);
+    }
     /* READ 256 BYTES RSA SIGNATURE */
+    uint8_t rsa_signature[256];
+    for (int i = 0; i < 256; i++) {
+        rcv = uart_read(UART1, BLOCKING, &read);
+        rsa_signature[i] = (uint8_t)rcv;
+    }
+    uart_write_str(UART2, "Received RSA Signature: ");
+    uart_write_hex(UART2, rsa_signature);
+    nl(UART2);
 
     /* ATTEMPT TO VERIFY INTEGRITY OF SIGNATURE  */
     /* 
