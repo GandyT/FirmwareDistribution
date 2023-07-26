@@ -30,7 +30,10 @@ import socket
 from util import *
 from pwn import *
 
-RESP_OK = p8(3, endian = "little")
+RESP_METADATA = p8(0, endian="little")
+RESP_MESSAGE = p8(1, endian="little")
+RESP_SIGNATURE = p8(2, endian="little")
+RESP_OK = p8(3, endian="little")
 FRAME_SIZE = 256
 
 def send_metadata(ser, metadata, debug=False):
@@ -51,11 +54,11 @@ def send_metadata(ser, metadata, debug=False):
 
     # ser.write(metadata[2:]) #temporary without bootloader
     #send complete BEGIN frame
-    message_type = p16(0, endian = "little")
+    message_type = RESP_METADATA
     ser.write(message_type + metadata)
     
     # Wait for an OK from the bootloader.
-    resp = ser.read(2)
+    resp = ser.read(1)
     
     time.sleep(0.1)
     
@@ -69,8 +72,7 @@ def send_frame(ser, frame, debug=False):
     if debug:
         print_hex(frame)
 
-    #ok message is a little endian short so should be 2 bytes
-    resp = ser.read(2)  # Wait for an OK from the bootloader
+    resp = ser.read(1)  # Wait for an OK from the bootloader
 
     time.sleep(0.1)
 
@@ -81,13 +83,13 @@ def send_frame(ser, frame, debug=False):
         print("Resp: {}".format(ord(resp)))
 
 def send_signature(ser, signature, debug=False):
-    message_type = p16(2, endian = "little")
+    message_type = RESP_MESSAGE
     ser.write(message_type + signature)
 
     if debug:
         print(message_type + "\n" + signature)
 
-    resp = ser.read(2)
+    resp = ser.read(1)
 
     time.sleep(0.1)
 
@@ -133,7 +135,7 @@ def update(ser, infile, debug):
     
     # Send a zero length payload to tell the bootlader to finish writing it's page.
     ser.write(struct.pack(">H", 0x0000))
-    resp = ser.read(2)  # Wait for an OK from the bootloader
+    resp = ser.read(1)  # Wait for an OK from the bootloader
     if resp != RESP_OK:
         raise RuntimeError("ERROR: Bootloader responded to zero length frame with {}".format(repr(resp)))
     print(f"Wrote zero length frame (2 bytes)")

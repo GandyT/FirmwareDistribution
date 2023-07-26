@@ -37,11 +37,11 @@ long program_flash(uint32_t, unsigned char *, unsigned int);
 #define FLASH_WRITESIZE 4
 
 // Protocol Constants
-#define METADATA ((unsigned char)0x00)
-#define MESSAGE ((unsigned char) 0x01)
-#define SIGNATURE ((unsigned char) 0x02)
-#define OK ((unsigned char) 0x03)
-#define ERROR ((unsigned char) 0x04)
+#define METADATA ((uint8_t)0x00)
+#define MESSAGE ((uint8_t) 0x01)
+#define SIGNATURE ((uint8_t) 0x02)
+#define OK ((uint8_t) 0x03)
+#define ERROR ((uint8_t) 0x04)
 
 #define UPDATE ((unsigned char)'U')
 #define BOOT ((unsigned char)'B')
@@ -191,16 +191,15 @@ void load_firmware(void){
     uint32_t version = 0; // firmware version
     uint32_t fw_size = 0; // size of firmware
     uint32_t rm_size = 0; // size of release message
-    uint16_t msg_type = 4; // type of message
+    uint8_t msg_type = 4; // type of message
     uint8_t iv[10]; // initialization vector for AES
     uint8_t hmac_tag[32]; //hmac_tag 
     
 
-    /* GET MSG TYPE (0x2 bytes)*/
+    /* GET MSG TYPE (0x1 bytes)*/
     rcv = uart_read(UART1, BLOCKING, &read);
-    msg_type = (uint16_t) rcv;
-    rcv = uart_read(UART1, BLOCKING, &read);
-    msg_type |= (uint16_t) rcv << 8;
+    msg_type = (uint8_t) rcv;
+
     uart_write_str(UART2, "Received Message Type: ");
     uart_write_hex(UART2, version);
     nl(UART2);
@@ -233,7 +232,8 @@ void load_firmware(void){
     rcv = uart_read(UART1, BLOCKING, &read);
     fw_size |= (uint32_t)rcv << 8;
 
-    uint8_t data[fw_size];
+    uint8_t fw_buffer[fw_size];
+    int fw_buffer_index = 0;
 
     // Write new firmware size and version to Flash
     // Create 32 bit word for flash programming, version is at lower address, size is at higher address
@@ -245,7 +245,7 @@ void load_firmware(void){
     /* GET IV (0x10 bytes) */
     for (int i = 0; i < 10; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
-        iv[i] = (uint16_t)rcv;
+        iv[i] = (uint8_t)rcv;
     }
 
     /* GET HMAC TAG (0x20 bytes) */
@@ -257,22 +257,21 @@ void load_firmware(void){
     /* VERIFY HMAC TAG */
     // hmac_verified = verify_hmac(hmac_tag, firmware_data, fw_size);
 
-    /* WAIT FOR MESSAGE TYPE 1 */
-    rcv = uart_read(UART1, BLOCKING, &read);
-    msg_type = (uint16_t) rcv;
-    rcv = uart_read(UART1, BLOCKING, &read);
-    msg_type |= (uint16_t) rcv << 8;
-    uart_write_str(UART2, "Received Message Type: ");
-    uart_write_hex(UART2, version);
-    nl(UART2);
-    
-    if (msg_type != MESSAGE) {
-        reject();
-        return;
-    }
-
     /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
     for (int i = 0; i < 256; ++i) {
+        /* WAIT FOR MESSAGE TYPE 1 */
+        rcv = uart_read(UART1, BLOCKING, &read);
+        msg_type = (uint8_t) rcv;
+
+        uart_write_str(UART2, "Received Message Type: ");
+        uart_write_hex(UART2, version);
+        nl(UART2);
+        
+        if (msg_type != MESSAGE) {
+            reject();
+            return;
+        }
+
         rcv = uart_read(UART1, BLOCKING, &read);
         frame_length = (int)rcv << 8;
         rcv = uart_read(UART1, BLOCKING, &read);
@@ -283,40 +282,23 @@ void load_firmware(void){
         nl(UART2);
 
         for (int i = 0; i < frame_length; ++i) {
-            data[data_index] = uart_read(UART1, BLOCKING, &read);
-            data_index += 1;
+            fw_buffer[fw_buffer_index] = uart_read(UART1, BLOCKING, &read);
+            fw_buffer_index += 1;
         }
 
         uart_write(UART1, OK);
     }
        
-    /* DECRYPT DATA WTIH AES AND IV */
+    size_t data_len = sizeof(fw_buffer);
 
-    /*
-    size_t data_len = sizeof(data);
-    br_ssl_client_context init_context;
-    br_ssl_client_init_full(&init_context, NULL, 0);
+    aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, data_len);
 
-    br_aes_gen_cbcdec_keys dec_context;
-    br_aes_big_cbcdec_init(&dec_context, aesKey, sizeof(aesKey));
-
-    //char decrypted_data[data_len];
-
-    //this sets the value of data to be decrypted
-    br_aes_big_cbcdec_run(&dec_context, iv, data, data_len);
-    //memcpy(&decrypted_data, data, data_len);
-    */
-   size_t data_len = sizeof(data);
-
-   if(aes_decrypt(aesKEY, iv, data, data_len)) {
-    printf("decrypt actually worked??");
-   }
+    // REMOVE PADDING
 
     /* WAIT FOR MESSAGE TYPE 2 (RSA SIG) */
     rcv = uart_read(UART1, BLOCKING, &read);
-    msg_type = (uint16_t) rcv;
-    rcv = uart_read(UART1, BLOCKING, &read);
-    msg_type |= (uint16_t) rcv << 8;
+    msg_type = (uint8_t) rcv;
+
     uart_write_str(UART2, "Received Message Type: ");
     uart_write_hex(UART2, version);
     nl(UART2);
