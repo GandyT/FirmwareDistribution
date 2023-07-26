@@ -30,7 +30,7 @@ import socket
 from util import *
 from pwn import *
 
-RESP_OK = p16(3, endian = "little")
+RESP_OK = p8(3, endian = "little")
 FRAME_SIZE = 256
 
 
@@ -57,6 +57,7 @@ def send_metadata(ser, metadata, debug=False):
     
     # Wait for an OK from the bootloader.
     resp = ser.read(2)
+    print(resp)
     if resp != RESP_OK:
         raise RuntimeError("ERROR: Bootloader responded with {}".format(repr(resp)))
 
@@ -113,14 +114,11 @@ def update(ser, infile, debug):
         # length = len(data)
         if len(data) < 256:
             data = pad(data, 256)
-        # frame_fmt = ">H{}s".format(length)
+        frame_fmt = ">H{}s".format(256)
 
         #new frame construction with new bootloader
         message_type = p16(1, endian = "little")
-        frame = message_type + struct.pack(data)
-        
-        # Construct frame.
-        # frame = struct.pack(frame_fmt, length, data)
+        frame = message_type + struct.pack(frame_fmt, 256, data)
 
         send_frame(ser, frame, debug=debug)
         print(f"Wrote frame {idx} ({len(frame)} bytes)")

@@ -173,6 +173,13 @@ void load_initial_firmware(void){
  * Load the firmware into flash.
  */
 
+// Returning the function is not a valid reject, needs to send error
+void reject() {
+    uart_write(UART1, ERROR); // Reject the data
+    SysCtlReset(); // Reset device
+    return;
+}
+
 void load_firmware(void){
     int frame_length = 0;
     int read = 0;
@@ -199,13 +206,16 @@ void load_firmware(void){
     nl(UART2);
 
     /* CHECK IF MSG TYPE IS 0 */
-    if (msg_type != METADATA) return;
+    if (msg_type != METADATA) {
+        reject();
+        return;
+    }
 
     /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
     rcv = uart_read(UART1, BLOCKING, &read);
-    fw_size = (uint32_t)rcv;
+    rm_size = (uint32_t)rcv;
     rcv = uart_read(UART1, BLOCKING, &read);
-    fw_size |= (uint32_t)rcv << 8;
+    rm_size |= (uint32_t)rcv << 8;
 
     /* GET FW_VERSION (0x2 bytes) */
     rcv = uart_read(UART1, BLOCKING, &read);
@@ -260,10 +270,13 @@ void load_firmware(void){
     uart_write_hex(UART2, version);
     nl(UART2);
     
-    if (msg_type != MESSAGE) return;
+    if (msg_type != MESSAGE) {
+        reject();
+        return;
+    }
 
     /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
-    while (1) {
+    for (int i = 0; i < 256; ++i) {
         rcv = uart_read(UART1, BLOCKING, &read);
         frame_length = (int)rcv << 8;
         rcv = uart_read(UART1, BLOCKING, &read);
@@ -294,7 +307,10 @@ void load_firmware(void){
     uart_write_hex(UART2, version);
     nl(UART2);
 
-    if (msg_type != SIGNATURE) return;
+    if (msg_type != SIGNATURE) {
+        reject();
+        return;
+    }
 
     /* READ 256 BYTES RSA SIGNATURE */
     uint8_t rsa_signature[256];
@@ -316,8 +332,7 @@ void load_firmware(void){
     uint16_t old_version = *fw_version_address;
 
     if (version != 0 && version < old_version){
-        uart_write(UART1, ERROR); // Reject the metadata.
-        SysCtlReset();            // Reset device
+        reject();
         return;
     }
 
@@ -352,16 +367,14 @@ void load_firmware(void){
             
             // Try to write flash and check for error
             if (program_flash(page_addr, data, data_index)){
-                uart_write(UART1, ERROR); // Reject the firmware
-                SysCtlReset();            // Reset device
+                reject();
                 return;
             }
 
             // Verify flash program
             if (memcmp(data, (void *) page_addr, data_index) != 0){
                 uart_write_str(UART2, "Flash check failed.\n");
-                uart_write(UART1, ERROR); // Reject the firmware
-                SysCtlReset();            // Reset device
+                reject();
                 return;
             }
 
