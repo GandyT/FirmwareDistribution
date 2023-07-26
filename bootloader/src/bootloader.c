@@ -288,7 +288,7 @@ void load_firmware(void){
     br_ssl_client_init_full(&init_context, NULL, 0);
 
     br_aes_gen_cbcdec_keys dec_context;
-    br_aes_big_bcbdec_init(&dec_context, aesKey, sizeof(aesKey));
+    br_aes_big_cbcdec_init(&dec_context, aesKey, sizeof(aesKey));
 
     //char decrypted_data[data_len];
 
