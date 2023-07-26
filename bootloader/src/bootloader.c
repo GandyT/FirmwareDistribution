@@ -179,7 +179,7 @@ void load_firmware(void){
     uint32_t version = 0; // firmware version
     uint32_t fw_size = 0; // size of firmware
     uint32_t rm_size = 0; // size of release message
-    uint8_t iv[10]; // initialization vector for AES
+    uint16_t iv[10]; // initialization vector for AES
 
     /* GET MSG TYPE (0x2 bytes)*/
     rcv = uart_read(UART1, BLOCKING, &read);
@@ -235,6 +235,7 @@ void load_firmware(void){
         rcv = uart_read(UART1, BLOCKING, &read);
         hmac_tag[i] = (uint8_t)rcv;
     }
+    
     /* VERIFY HMAC TAG */
     hmac_verified = verify_hmac(hmac_tag, firmware_data, fw_size);
 
@@ -246,10 +247,7 @@ void load_firmware(void){
 
     /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
        
-
     /* DECRYPT DATA WTIH AES AND IV */
-
-
 
     /* WAIT FOR MESSAGE TYPE 2 (RSA SIG) */
     /* READ 256 BYTES RSA SIGNATURE */
