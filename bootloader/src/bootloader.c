@@ -180,11 +180,27 @@ void load_firmware(void){
     uint32_t size = 0;
 
     /* GET MSG TYPE (0x2 bytes)*/
+    uint8_t msg_type = uart_read(UART1, BLOCKING, &read);
+    uart_write_str(UART2, "Received Message Type: ");
+    uart_write_hex(UART2, version);
+    nl(UART2);
+
     /* CHECK IF MSG TYPE IS 0 */
+    if (msg_type != 0) return;
+
     /* GET FW_VERSION (0x2 bytes) */
+    uint16_t fw_version = uart_read(UART1, BLCOKING, &version);
+    uart_write_str(UART2, "Received fw version: ");
+    uart_write_hex(UART2, version);
+    nl(UART2);
+   
     /* GET FW_SIZE (0x2 bytes) */
+    uint16_t fw_size;
+
     /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
+    uint16_t release_msg_size; 
     /* GET IV (0x10 bytes) */
+
     /* GET HMAC TAG (0x20 bytes) */
     /* VERIFY HMAC TAG */
 
