@@ -240,12 +240,6 @@ void load_firmware(void){
 
     uart_write(UART1, OK); // Acknowledge the metadata.
 
-    /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
-    rcv = uart_read(UART1, BLOCKING, &read);
-    rm_size = (uint32_t)rcv;
-    rcv = uart_read(UART1, BLOCKING, &read);
-    rm_size |= (uint32_t)rcv << 8;
-
     /* GET IV (0x10 bytes) */
     for (int i = 0; i < 10; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
