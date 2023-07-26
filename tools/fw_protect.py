@@ -5,7 +5,6 @@
 
 """
 Firmware Bundle-and-Protect Tool
-
 """
 import argparse
 import struct
