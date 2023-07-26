@@ -82,9 +82,9 @@ def send_signature(ser, signature, debug=False):
     if debug:
         print(signature)
 
-    time.sleep(1)
-
     resp = ser.read(2)
+
+    time.sleep(0.1)
 
     if resp != RESP_OK:
         raise RuntimeError("ERROR: Bootloader responded with {}".format(repr(resp)))

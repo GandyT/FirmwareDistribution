@@ -176,8 +176,10 @@ void load_firmware(void){
 
     uint32_t data_index = 0;
     uint32_t page_addr = FW_BASE;
-    uint32_t version = 0;
-    uint32_t size = 0;
+    uint32_t version = 0; // firmware version
+    uint32_t fw_size = 0; // size of firmware
+    uint32_t rm_size = 0; // size of release message
+    uint16_t iv[10]; // initialization vector for AES
 
     /* GET MSG TYPE (0x2 bytes)*/
     uint8_t msg_type = uart_read(UART1, BLOCKING, &read);
@@ -189,9 +191,30 @@ void load_firmware(void){
     if (msg_type != 0) return;
 
     /* GET FW_VERSION (0x2 bytes) */
+    rcv = uart_read(UART1, BLOCKING, &read);
+    version = (uint32_t)rcv;
+    rcv = uart_read(UART1, BLOCKING, &read);
+    version |= (uint32_t)rcv << 8;
+
+    uart_write_str(UART2, "Received Firmware Version: ");
+    uart_write_hex(UART2, version);
+    nl(UART2);
+
     /* GET FW_SIZE (0x2 bytes) */
+    rcv = uart_read(UART1, BLOCKING, &read);
+    fw_size = (uint32_t)rcv;
+    rcv = uart_read(UART1, BLOCKING, &read);
+    fw_size |= (uint32_t)rcv << 8;
+
     /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
+    rcv = uart_read(UART1, BLOCKING, &read);
+    fw_size = (uint32_t)rcv;
+    rcv = uart_read(UART1, BLOCKING, &read);
+    fw_size |= (uint32_t)rcv << 8;
+
     /* GET IV (0x10 bytes) */
+
+
     /* GET HMAC TAG (0x20 bytes) */
     /* VERIFY HMAC TAG */
 
@@ -207,23 +230,6 @@ void load_firmware(void){
     Signature generated with:
     ([firmware with releasemsg] + rm_size + version + fw_size + IV + HMAC tag)
     */
-
-
-    // Get version as 16 bytes 
-    rcv = uart_read(UART1, BLOCKING, &read);
-    version = (uint32_t)rcv;
-    rcv = uart_read(UART1, BLOCKING, &read);
-    version |= (uint32_t)rcv << 8;
-
-    uart_write_str(UART2, "Received Firmware Version: ");
-    uart_write_hex(UART2, version);
-    nl(UART2);
-
-    // Get size as 16 bytes 
-    rcv = uart_read(UART1, BLOCKING, &read);
-    size = (uint32_t)rcv;
-    rcv = uart_read(UART1, BLOCKING, &read);
-    size |= (uint32_t)rcv << 8;
 
     uart_write_str(UART2, "Received Firmware Size: ");
     uart_write_hex(UART2, size);
