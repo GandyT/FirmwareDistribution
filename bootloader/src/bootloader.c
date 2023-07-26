@@ -14,7 +14,7 @@
 
 // Library Imports
 #include <string.h>
-#include <bearssl.h>
+#include <beaverssl.h>
 
 // Application Imports
 #include "uart.h"
@@ -204,7 +204,7 @@ void load_firmware(void){
     uint16_t msg_type = 4; // type of message
     uint8_t iv[10]; // initialization vector for AES
     uint8_t hmac_tag[32]; //hmac_tag 
-    uint8_t data[256];
+    
 
     /* GET MSG TYPE (0x2 bytes)*/
     rcv = uart_read(UART1, BLOCKING, &read);
@@ -242,6 +242,8 @@ void load_firmware(void){
     fw_size = (uint32_t)rcv;
     rcv = uart_read(UART1, BLOCKING, &read);
     fw_size |= (uint32_t)rcv << 8;
+
+    uint8_t data[fw_size];
 
     // Write new firmware size and version to Flash
     // Create 32 bit word for flash programming, version is at lower address, size is at higher address
@@ -314,6 +316,11 @@ void load_firmware(void){
     br_aes_big_cbcdec_run(&dec_context, iv, data, data_len);
     //memcpy(&decrypted_data, data, data_len);
     */
+   size_t data_len = sizeof(data);
+
+   if(aes_decrypt(aesKEY, iv, data, data_len)) {
+    printf("decrypt actually worked??");
+   }
 
     /* WAIT FOR MESSAGE TYPE 2 (RSA SIG) */
     rcv = uart_read(UART1, BLOCKING, &read);
