@@ -37,8 +37,11 @@ long program_flash(uint32_t, unsigned char *, unsigned int);
 #define FLASH_WRITESIZE 4
 
 // Protocol Constants
+#define METADATA ((unsigned char)0x00)
+#define MESSAGE ((unsigned char) 0x01)
+#define SIGNATURE ((unsigned char) 0x02)
 #define OK ((unsigned char)0x03)
-#define ERROR ((unsigned char)0x01)
+
 #define UPDATE ((unsigned char)'U')
 #define BOOT ((unsigned char)'B')
 
@@ -180,13 +183,14 @@ void load_firmware(void){
     uint32_t version = 0; // firmware version
     uint32_t fw_size = 0; // size of firmware
     uint32_t rm_size = 0; // size of release message
-    uint16_t iv[10]; // initialization vector for AES
+    uint16_t msg_type = 4; // type of message
+    uint8_t iv[10]; // initialization vector for AES
     uint8_t hmac_tag[32]; //hmac_tag 
     uint8_t data[256];
 
     /* GET MSG TYPE (0x2 bytes)*/
     rcv = uart_read(UART1, BLOCKING, &read);
-    uint16_t msg_type = (uint16_t) rcv;
+    msg_type = (uint16_t) rcv;
     rcv = uart_read(UART1, BLOCKING, &read);
     msg_type |= (uint16_t) rcv << 8;
     uart_write_str(UART2, "Received Message Type: ");
@@ -194,7 +198,7 @@ void load_firmware(void){
     nl(UART2);
 
     /* CHECK IF MSG TYPE IS 0 */
-    if (msg_type != 0) return;
+    if (msg_type != METADATA) return;
 
     /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
     rcv = uart_read(UART1, BLOCKING, &read);
@@ -218,6 +222,13 @@ void load_firmware(void){
     rcv = uart_read(UART1, BLOCKING, &read);
     fw_size |= (uint32_t)rcv << 8;
 
+    // Write new firmware size and version to Flash
+    // Create 32 bit word for flash programming, version is at lower address, size is at higher address
+    uint32_t metadata = ((size & 0xFFFF) << 16) | (version & 0xFFFF);
+    program_flash(METADATA_BASE, (uint8_t *)(&metadata), 4);
+
+    uart_write(UART1, OK); // Acknowledge the metadata.
+
     /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
     rcv = uart_read(UART1, BLOCKING, &read);
     release_msg_size = (uint32_t)rcv;
@@ -228,8 +239,6 @@ void load_firmware(void){
     for (int i = 0; i < 10; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
         iv[i] = (uint16_t)rcv;
-        rcv = uart_read(UART1, BLOCKING, &read);
-        iv[i] |= (uint16_t)rcv << 8;
     }
 
     /* GET HMAC TAG (0x20 bytes) */
@@ -242,10 +251,15 @@ void load_firmware(void){
     hmac_verified = verify_hmac(hmac_tag, firmware_data, fw_size);
 
     /* WAIT FOR MESSAGE TYPE 1 */
-    uint16_t msg_type_1 = 0;
-    while (msg_type_1 != 1) {
-        msg_type_1 = uart_read(UART1, BLOCKING, &read);
-    }
+    rcv = uart_read(UART1, BLOCKING, &read);
+    msg_type = (uint16_t) rcv;
+    rcv = uart_read(UART1, BLOCKING, &read);
+    msg_type |= (uint16_t) rcv << 8;
+    uart_write_str(UART2, "Received Message Type: ");
+    uart_write_hex(UART2, version);
+    nl(UART2);
+    
+    if (msg_type != MESSAGE) return;
 
     /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
     while (1) {
@@ -253,6 +267,10 @@ void load_firmware(void){
         frame_length = (int)rcv << 8;
         rcv = uart_read(UART1, BLOCKING, &read);
         frame_length += (int)rcv;
+
+        // Write length debug message
+        uart_write_hex(UART2, frame_length);
+        nl(UART2);
 
         for (int i = 0; i < frame_length; ++i) {
             data[data_index] = uart_read(UART1, BLOCKING, &read);
@@ -264,13 +282,19 @@ void load_firmware(void){
        
     /* DECRYPT DATA WTIH AES AND IV */
 
-
+    
 
     /* WAIT FOR MESSAGE TYPE 2 (RSA SIG) */
-    uint16_t msg_type_2 = 0;
-    while(msg_type_2 != 2) {
-        msg_type_2 = uart_read(UART1, BLOCKING, &read);
-    }
+    rcv = uart_read(UART1, BLOCKING, &read);
+    msg_type = (uint16_t) rcv;
+    rcv = uart_read(UART1, BLOCKING, &read);
+    msg_type |= (uint16_t) rcv << 8;
+    uart_write_str(UART2, "Received Message Type: ");
+    uart_write_hex(UART2, version);
+    nl(UART2);
+
+    if (msg_type != SIGNATURE) return;
+
     /* READ 256 BYTES RSA SIGNATURE */
     uint8_t rsa_signature[256];
     for (int i = 0; i < 256; i++) {
@@ -287,10 +311,6 @@ void load_firmware(void){
     ([firmware with releasemsg] + rm_size + version + fw_size + IV + HMAC tag)
     */
 
-    uart_write_str(UART2, "Received Firmware Size: ");
-    uart_write_hex(UART2, size);
-    nl(UART2);
-
     // Compare to old version and abort if older (note special case for version 0).
     uint16_t old_version = *fw_version_address;
 
@@ -305,12 +325,7 @@ void load_firmware(void){
         version = old_version;
     }
 
-    // Write new firmware size and version to Flash
-    // Create 32 bit word for flash programming, version is at lower address, size is at higher address
-    uint32_t metadata = ((size & 0xFFFF) << 16) | (version & 0xFFFF);
-    program_flash(METADATA_BASE, (uint8_t *)(&metadata), 4);
-
-    uart_write(UART1, OK); // Acknowledge the metadata.
+    
 
     /* Loop here until you can get all your characters and stuff */
     while (1){
