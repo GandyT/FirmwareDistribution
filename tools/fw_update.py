@@ -55,6 +55,7 @@ def send_metadata(ser, metadata, debug=False):
     # ser.write(metadata[2:]) #temporary without bootloader
     #send complete BEGIN frame
     message_type = RESP_METADATA
+    print(len(metadata))
     ser.write(message_type + metadata)
     
     # Wait for an OK from the bootloader.

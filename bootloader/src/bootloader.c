@@ -257,6 +257,15 @@ void load_firmware(void){
     /* VERIFY HMAC TAG */
     // hmac_verified = verify_hmac(hmac_tag, firmware_data, fw_size);
 
+    /* READ 256 BYTES RSA SIGNATURE */
+    uint8_t rsa_signature[256];
+    for (int i = 0; i < 256; i++) {
+        rcv = uart_read(UART1, BLOCKING, &read);
+        rsa_signature[i] = (uint8_t)rcv;
+    }
+    uart_write_str(UART2, "Received RSA Signature: ");
+    nl(UART2);
+
     /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
     for (int i = 0; i < 256; ++i) {
         /* WAIT FOR MESSAGE TYPE 1 */
@@ -307,16 +316,6 @@ void load_firmware(void){
         reject();
         return;
     }
-
-    /* READ 256 BYTES RSA SIGNATURE */
-    uint8_t rsa_signature[256];
-    for (int i = 0; i < 256; i++) {
-        rcv = uart_read(UART1, BLOCKING, &read);
-        rsa_signature[i] = (uint8_t)rcv;
-    }
-    uart_write_str(UART2, "Received RSA Signature: ");
-    uart_write_hex(UART2, rsa_signature);
-    nl(UART2);
 
     /* ATTEMPT TO VERIFY INTEGRITY OF SIGNATURE  */
     /* 
