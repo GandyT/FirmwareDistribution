@@ -382,6 +382,40 @@ void load_firmware(void){
         sig_base_index++;
     }
 
+    br_sha256_context* context;
+    br_sha256_init(context);
+    br_sha256_update(context, sig_base, sig_base_len); 
+    unsigned char output[FLASH_PAGESIZE];
+    br_sha256_out(context, output);
+    // int keySize = sizeof(rsaModulus) / sizeof(rsaModulus[0]);
+    // uint8_t public_key[256 + keySize];
+    // for (int i = 0; i < 256; i++){
+    //     public_key[i] = rsaModulus[i];
+    // }
+    // for (int j = 0; j < keySize; j++){
+    //     public_key[j + 256] = rsaExponent[j];
+    // }
+    
+    // if (!(br_rsa_pkcs1_vrfy(signature, NULL, sig_base_len, rsaModulus, output))){
+    //     reject();
+    //     return;
+    // }
+    
+    // Compare to old version and abort if older (note special case for version 0).
+    uint16_t old_version = *fw_version_address;
+
+    if (version != 0 && version < old_version){
+        reject();
+        return;
+    }
+
+    if (version == 0){
+        // If debug firmware, don't change version
+        version = old_version;
+    }
+
+    
+
     /* WRITE fw_buffer into flash */
     // don't write padding
     // 1024 / 256 = 4
