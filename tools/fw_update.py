@@ -153,12 +153,10 @@ def update(ser, infile, debug):
     
     print("Done writing signature.")
     
-    # Send a zero length payload to tell the bootlader to finish writing it's page.
-    ser.write(struct.pack(">H", 0x0000))
     resp = ser.read(1)  # Wait for an OK from the bootloader
     if resp != RESP_OK:
         raise RuntimeError("ERROR: Bootloader responded to zero length frame with {}".format(repr(resp)))
-    print(f"Wrote zero length frame (2 bytes)")
+    print(f"Finished Updating...")
 
     return ser
 

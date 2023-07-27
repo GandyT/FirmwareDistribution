@@ -325,14 +325,31 @@ void load_firmware(void){
 
     aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, data_len);
 
-    /* REMOVE PADDING */
-
     /* ATTEMPT TO VERIFY INTEGRITY OF SIGNATURE  */
     /* 
     Signature generated with:
-    ([firmware with releasemsg] + rm_size + version + fw_size + IV + HMAC tag)
+    ([firmware with releasemsg] + fw_size + version + rm_size + IV + HMAC tag)
+    verify with rsaKey
     */
+    int sig_base_len = fw_size + rm_size + 0x2 + 0x2 + 0x2 + 0x10 + 0x32;
+    uint8_t sig_base[sig_base_len]; // the data used to generate the signature
+    int sig_base_index = 0;
 
+    for (int i = 0; i < fw_size + rm_size; ++i) {
+        sig_base[sig_base_index] = fw_buffer[i];
+        sig_base_index++;
+    }
+
+    /* add shorts */
+    uint8_t byte1 = (uint8_t) (fw_size && 0xFF);
+    uint8_t byte2 = (uint8_t) (fw_size << 8);
+
+    sig_base[sig_base_index++] = byte1;
+    sig_base[sig_base_index++] = byte2;
+
+    byte1 = (uint8_t) (version && 0xFF);
+    byte2 = (uint8_t) (version << 8);
+    
     // Compare to old version and abort if older (note special case for version 0).
     uint16_t old_version = *fw_version_address;
 
@@ -348,26 +365,32 @@ void load_firmware(void){
 
     
 
-    /* Loop here until you can get all your characters and stuff */
+    /* WRITE fw_buffer into flash */
+    // don't write padding
+    // 1024 / 256 = 4
+    fw_length = fw_size + rm_size;
+    fw_buffer_index = 0;
+
+    uint8_t completed = 0; // set to 1 if read all bytes from buffer
     while (1){
+        
 
-        // Get two bytes for the length.
-        rcv = uart_read(UART1, BLOCKING, &read);
-        frame_length = (int)rcv << 8;
-        rcv = uart_read(UART1, BLOCKING, &read);
-        frame_length += (int)rcv;
+        for (int i = 0; i < FRAME_SIZE; ++i){
+            if (fw_buffer_index >= fw_length) {
+                completed = 1;
+                break;
+            }
 
-        // Get the number of bytes specified
-        for (int i = 0; i < frame_length; ++i){
-            data[data_index] = uart_read(UART1, BLOCKING, &read);
+            data[data_index] = fw_buffer[fw_buffer_index];
+            fw_buffer_index += 1;
             data_index += 1;
         } // for
 
         // If we filed our page buffer, program it
-        if (data_index == FLASH_PAGESIZE || frame_length == 0){
+        if (data_index == FLASH_PAGESIZE || completed == 1){
 
-            if(frame_length == 0){
-                uart_write_str(UART2, "Got zero length frame.\n");
+            if(completed == 1){
+                uart_write_str(UART2, "Finished reading data from buffer\n");
             }
             
             // Try to write flash and check for error
@@ -395,14 +418,12 @@ void load_firmware(void){
             data_index = 0;
 
             // If at end of firmware, go to main
-            if (frame_length == 0){
+            if (completed == 1){
                 uart_write(UART1, OK);
                 break;
             }
-        } // if
-
-        uart_write(UART1, OK); // Acknowledge the frame.
-    }                          // while(1)
+        }
+    }                          
 }
 
 /*
