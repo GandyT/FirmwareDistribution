@@ -320,10 +320,8 @@ void load_firmware(void){
     uart_write_str(UART2, "Received RSA Signature: ");
     nl(UART2);
     uart_write(UART1, OK);
-       
-    size_t data_len = sizeof(fw_buffer);
 
-    aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, data_len);
+    aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, fw_length);
 
     /* ATTEMPT TO VERIFY INTEGRITY OF SIGNATURE  */
     /* 
