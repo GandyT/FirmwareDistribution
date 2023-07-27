@@ -46,6 +46,8 @@ long program_flash(uint32_t, unsigned char *, unsigned int);
 #define UPDATE ((unsigned char)'U')
 #define BOOT ((unsigned char)'B')
 
+#define FRAME_SIZE ((uint16_t) 256)
+
 // Firmware v2 is embedded in bootloader
 // Read up on these symbols in the objcopy man page (if you want)!
 extern int _binary_firmware_bin_start;
@@ -230,7 +232,12 @@ void load_firmware(void){
     uart_write_hex(UART2, version);
     nl(UART2);
 
-    uint8_t fw_buffer[fw_size + rm_size];
+    int fw_length = fw_size + rm_size;
+    int remaining = fw_length % 256;
+    fw_length += (FRAME_SIZE - remaining)
+    // account for padding
+
+    uint8_t fw_buffer[fw_length];
     int fw_buffer_index = 0;
 
     /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
@@ -283,13 +290,11 @@ void load_firmware(void){
             return;
         }
 
-        for (int i = 0; i < 256; ++i) {
+        for (int i = 0; i < FRAME_SIZE; ++i) {
             rcv = uart_read(UART1, BLOCKING, &read);
 
-            if (fw_buffer_index < fw_size + rm_size) {
-                fw_buffer[fw_buffer_index] = (uint8_t) rcv;
-                fw_buffer_index += 1;
-            }
+            fw_buffer[fw_buffer_index] = (uint8_t) rcv;
+            fw_buffer_index += 1;
         }
 
         uart_write(UART1, OK);
