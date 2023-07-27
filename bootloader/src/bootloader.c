@@ -234,7 +234,7 @@ void load_firmware(void){
 
     int fw_length = fw_size + rm_size;
     int remaining = fw_length % 256;
-    fw_length += (FRAME_SIZE - remaining)
+    fw_length += (FRAME_SIZE - remaining);
     // account for padding
 
     uint8_t fw_buffer[fw_length];
