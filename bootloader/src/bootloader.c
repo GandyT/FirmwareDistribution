@@ -287,7 +287,7 @@ void load_firmware(void){
             rcv = uart_read(UART1, BLOCKING, &read);
 
             if (fw_buffer_index < fw_size + rm_size) {
-                fw_buffer[fw_buffer_index] = (unint8_t) rcv;
+                fw_buffer[fw_buffer_index] = (uint8_t) rcv;
                 fw_buffer_index += 1;
             }
         }
