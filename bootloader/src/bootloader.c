@@ -349,6 +349,26 @@ void load_firmware(void){
 
     byte1 = (uint8_t) (version && 0xFF);
     byte2 = (uint8_t) (version << 8);
+
+    sig_base[sig_base_index++] = byte1;
+    sig_base[sig_base_index++] = byte2;
+
+    byte1 = (uint8_t) (rm_size && 0xFF);
+    byte2 = (uint8_t) (rm_size << 8);
+
+    sig_base[sig_base_index++] = byte1;
+    sig_base[sig_base_index++] = byte2;
+
+    /* ADD TAGS */
+    for (int i = 0; i < 0x10; ++i) {
+        sig_base[sig_base_index] = iv[i];
+        sig_base_index++;
+    }
+
+    for (int i = 0; i < 0x20; ++i) {
+        sig_base[sig_base_index] = hmac_tag[i];
+        sig_base_index++;
+    }
     
     // Compare to old version and abort if older (note special case for version 0).
     uint16_t old_version = *fw_version_address;
