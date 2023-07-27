@@ -93,7 +93,7 @@ def send_frame(ser, frame, debug=False):
         print("Resp: {}".format(ord(resp)))
 
 def send_signature(ser, signature, debug=False):
-    message_type = RESP_MESSAGE
+    message_type = RESP_SIGNATURE
     ser.write(message_type + signature)
 
     if debug:
