@@ -196,6 +196,7 @@ void load_firmware(void){
     uint8_t msg_type = 4; // type of message
     uint8_t iv[10]; // initialization vector for AES
     uint8_t hmac_tag[32]; //hmac_tag 
+    int fw_length = 0; // length of fw
     
 
     /* GET MSG TYPE (0x1 bytes)*/
@@ -228,6 +229,19 @@ void load_firmware(void){
     rcv = uart_read(UART1, BLOCKING, &read);
     version |= (uint32_t)rcv << 8;
 
+    // Compare to old version and abort if older (note special case for version 0).
+    uint16_t old_version = *fw_version_address;
+
+    if (version != 0 && version < old_version){
+        reject();
+        return;
+    }
+
+    if (version == 0){
+        // If debug firmware, don't change version
+        version = old_version;
+    }
+
     uart_write_str(UART2, "Received Firmware Version: ");
     uart_write_hex(UART2, version);
     nl(UART2);
@@ -242,18 +256,17 @@ void load_firmware(void){
     uart_write_hex(UART2, rm_size);
     nl(UART2);
 
-    int fw_length = fw_size + rm_size;
-    int remaining = fw_length % 256;
-    fw_length += (FRAME_SIZE - remaining);
-    // account for padding
-
-    uint8_t fw_buffer[fw_length];
-    int fw_buffer_index = 0;
-
     // Write new firmware size and version to Flash
     // Create 32 bit word for flash programming, version is at lower address, size is at higher address
     uint32_t metadata = ((fw_size & 0xFFFF) << 16) | (version & 0xFFFF);
     program_flash(METADATA_BASE, (uint8_t *)(&metadata), 4);
+
+    int remaining = (rm_size + fw_size) % 256;
+    fw_length = rm_size + fw_size + (FRAME_SIZE - remaining);
+    // account for padding
+
+    uint8_t fw_buffer[rm_size + fw_size + (FRAME_SIZE - remaining)];
+    int fw_buffer_index = 0;
 
     uart_write(UART1, OK);
 
@@ -301,7 +314,6 @@ void load_firmware(void){
     }
 
     /* MESSAGE TYPE 2 (RSA SIG) ALREADY READ */
-
     uart_write_str(UART2, "Received Message Type: ");
     uart_write_hex(UART2, version);
     nl(UART2);
@@ -321,7 +333,9 @@ void load_firmware(void){
     nl(UART2);
     uart_write(UART1, OK);
 
-    aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, fw_length);
+    int buffer_size = sizeof(fw_buffer);
+
+    aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, buffer_size);
 
     /* ATTEMPT TO VERIFY INTEGRITY OF SIGNATURE  */
     /* 
@@ -367,21 +381,6 @@ void load_firmware(void){
         sig_base[sig_base_index] = hmac_tag[i];
         sig_base_index++;
     }
-    
-    // Compare to old version and abort if older (note special case for version 0).
-    uint16_t old_version = *fw_version_address;
-
-    if (version != 0 && version < old_version){
-        reject();
-        return;
-    }
-
-    if (version == 0){
-        // If debug firmware, don't change version
-        version = old_version;
-    }
-
-    
 
     /* WRITE fw_buffer into flash */
     // don't write padding
