@@ -40,7 +40,9 @@ ZERO_BYTE = p8(0, endian="little")
 FRAME_SIZE = 256
 
 def send_metadata(ser, metadata, debug=False):
-    fw_size, version, rm_size = struct.unpack_from("<HHH", metadata[:6])
+    fw_size = u16(metadata[:2], endian = "little")
+    version = u16(metadata[2:4], endian = "little")
+    rm_size = u16(metadata[4:6], endian = "little")
     print(f"fw_size: {fw_size}\nVersion: {version}\nrm_size: {rm_size} bytes\n")
 
     # Handshake for update
