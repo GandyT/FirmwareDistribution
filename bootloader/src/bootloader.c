@@ -295,9 +295,7 @@ void load_firmware(void){
         uart_write(UART1, OK);
     }
 
-    /* WAIT FOR MESSAGE TYPE 2 (RSA SIG) */
-    rcv = uart_read(UART1, BLOCKING, &read);
-    msg_type = (uint8_t) rcv;
+    /* MESSAGE TYPE 2 (RSA SIG) ALREADY READ */
 
     uart_write_str(UART2, "Received Message Type: ");
     uart_write_hex(UART2, version);
