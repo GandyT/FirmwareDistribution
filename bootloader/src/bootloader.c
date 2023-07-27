@@ -343,6 +343,7 @@ void load_firmware(void){
     ([firmware with releasemsg] + fw_size + version + rm_size + IV + HMAC tag)
     verify with rsaKey
     */
+
     int sig_base_len = fw_size + rm_size + 0x2 + 0x2 + 0x2 + 0x10 + 0x32;
     uint8_t sig_base[sig_base_len]; // the data used to generate the signature
     int sig_base_index = 0;
@@ -381,6 +382,8 @@ void load_firmware(void){
         sig_base[sig_base_index] = hmac_tag[i];
         sig_base_index++;
     }
+
+    /* br_rsa_public_key pub_key = {rsaModulus, sizeof(rsaModulus), rsaExponent, sizeof(rsaExponent)}; */
 
     /*
     br_sha256_context* context;
