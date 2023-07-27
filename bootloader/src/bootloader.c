@@ -400,21 +400,6 @@ void load_firmware(void){
     //     reject();
     //     return;
     // }
-    
-    // Compare to old version and abort if older (note special case for version 0).
-    uint16_t old_version = *fw_version_address;
-
-    if (version != 0 && version < old_version){
-        reject();
-        return;
-    }
-
-    if (version == 0){
-        // If debug firmware, don't change version
-        version = old_version;
-    }
-
-    
 
     /* WRITE fw_buffer into flash */
     // don't write padding
