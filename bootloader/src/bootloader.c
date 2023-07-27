@@ -345,7 +345,7 @@ void load_firmware(void){
     */
 
     int sig_base_len = fw_size + rm_size + 0x2 + 0x2 + 0x2 + 0x10 + 0x32;
-    uint8_t sig_base[sig_base_len]; // the data used to generate the signature
+    uint8_t sig_base[sig_base_len]; // the data used to generate the RSA Signature
     int sig_base_index = 0;
 
     for (int i = 0; i < fw_size + rm_size; ++i) {
@@ -416,7 +416,7 @@ void load_firmware(void){
     while (1){
         
 
-        for (int i = 0; i < FRAME_SIZE; ++i){
+        for (int i = 0; i < FLASH_PAGESIZE; ++i){
             if (fw_buffer_index >= fw_length) {
                 completed = 1;
                 break;
