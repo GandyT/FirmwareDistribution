@@ -29,14 +29,21 @@ import socket
 
 from util import *
 
-RESP_OK = b"\x00"
+from Crypto.Util.Padding import pad
+
+RESP_METADATA = p8(0, endian="little")
+RESP_MESSAGE = p8(1, endian="little")
+RESP_SIGNATURE = p8(2, endian="little")
+RESP_OK = p8(3, endian="little")
+ZERO_BYTE = p8(0, endian="little")
 FRAME_SIZE = 256
 
-
 def send_metadata(ser, metadata, debug=False):
-    version, size = struct.unpack_from("<HH", metadata)
-    print(f"Version: {version}\nSize: {size} bytes\n")
-
+    fw_size = u16(metadata[:2], endian = "little")
+    version = u16(metadata[2:4], endian = "little")
+    rm_size = u16(metadata[4:6], endian = "little")
+    print(f"fw_size: {fw_size}\nVersion: {version}\nrm_size: {rm_size} bytes\n")
+    
     # Handshake for update
     ser.write(b"U")
 
@@ -49,10 +56,21 @@ def send_metadata(ser, metadata, debug=False):
     if debug:
         print(metadata)
 
-    ser.write(metadata)
+    # ser.write(metadata[2:]) #temporary without bootloader
+    #send complete BEGIN frame
+    message_type = RESP_METADATA
+    packed_metadata = b""
 
+    for byte in metadata:
+        packed_metadata += p8(byte, endian="little")
+
+    ser.write(message_type + packed_metadata)
+    
     # Wait for an OK from the bootloader.
     resp = ser.read(1)
+    
+    time.sleep(0.1)
+    
     if resp != RESP_OK:
         raise RuntimeError("ERROR: Bootloader responded with {}".format(repr(resp)))
 
@@ -73,14 +91,40 @@ def send_frame(ser, frame, debug=False):
     if debug:
         print("Resp: {}".format(ord(resp)))
 
+def send_signature(ser, signature, debug=False):
+    message_type = RESP_SIGNATURE
+    packed_signature = b""
+
+    for byte in signature:
+        packed_signature += p8(byte, endian="little")
+
+    ser.write(message_type + packed_signature)
+
+    if debug:
+        print(message_type)
+        print(packed_signature)
+
+    resp = ser.read(1)
+
+    time.sleep(0.1)
+
+    if resp != RESP_OK:
+        raise RuntimeError("ERROR: Bootloader responded with {}".format(repr(resp)))
+
+    
 
 def update(ser, infile, debug):
     # Open serial port. Set baudrate to 115200. Set timeout to 2 seconds.
     with open(infile, "rb") as fp:
         firmware_blob = fp.read()
 
-    metadata = firmware_blob[:4]
-    firmware = firmware_blob[4:]
+    # print(firmware_blob)
+    metadata_IV_tag = firmware_blob[:54]
+    rm_size = u16(firmware_blob[4:6], endian = "little")
+    signature = firmware_blob[54: 310]
+
+    firmware_message = firmware_blob[310:]
+    send_metadata(ser, metadata_IV_tag, debug=debug)
 
     send_metadata(ser, metadata, debug=debug)
 
@@ -88,23 +132,32 @@ def update(ser, infile, debug):
         data = firmware[frame_start : frame_start + FRAME_SIZE]
 
         # Get length of data.
-        length = len(data)
-        frame_fmt = ">H{}s".format(length)
+        # length = len(data)
+        if len(data) < FRAME_SIZE:
+            data = pad(data, FRAME_SIZE)
+        frame_fmt = ">H{}s".format(FRAME_SIZE)
 
-        # Construct frame.
-        frame = struct.pack(frame_fmt, length, data)
+        #new frame construction with new bootloader
+        packed_data = b""
+        for byte in data:
+            packed_data += p8(byte, endian="little")
+        
+        frame = RESP_MESSAGE + data
 
         send_frame(ser, frame, debug=debug)
         print(f"Wrote frame {idx} ({len(frame)} bytes)")
 
     print("Done writing firmware.")
 
-    # Send a zero length payload to tell the bootlader to finish writing it's page.
-    ser.write(struct.pack(">H", 0x0000))
+    #send signature to bootloader
+    send_signature(ser, signature, debug=debug)
+    
+    print("Done writing signature.")
+    
     resp = ser.read(1)  # Wait for an OK from the bootloader
     if resp != RESP_OK:
         raise RuntimeError("ERROR: Bootloader responded to zero length frame with {}".format(repr(resp)))
-    print(f"Wrote zero length frame (2 bytes)")
+    print(f"Finished Updating...")
 
     return ser
 

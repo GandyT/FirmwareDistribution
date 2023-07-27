@@ -35,7 +35,7 @@ def protect_firmware(infile, outfile, version, message):
 
     firmware_and_message = pad(firmware + message.encode(), AES.block_size)
 
-    metadata = struct.pack('<HHH', len(message.encode()), version, len(firmware))
+    metadata = p16(len(firmware), endian = "little") + p16(version, endian = "little") + p16(len(message.encode()), endian = "little")
     
     #create an IV and hash metadata using HMAC
     IV = get_random_bytes(16)
