@@ -232,14 +232,6 @@ void load_firmware(void){
     uart_write_hex(UART2, version);
     nl(UART2);
 
-    int fw_length = fw_size + rm_size;
-    int remaining = fw_length % 256;
-    fw_length += (FRAME_SIZE - remaining);
-    // account for padding
-
-    uint8_t fw_buffer[fw_length];
-    int fw_buffer_index = 0;
-
     /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
     rcv = uart_read(UART1, BLOCKING, &read);
     rm_size = (uint32_t)rcv;
@@ -249,6 +241,14 @@ void load_firmware(void){
     uart_write_str(UART2, "Received Release Message Size: ");
     uart_write_hex(UART2, rm_size);
     nl(UART2);
+
+    int fw_length = fw_size + rm_size;
+    int remaining = fw_length % 256;
+    fw_length += (FRAME_SIZE - remaining);
+    // account for padding
+
+    uint8_t fw_buffer[fw_length];
+    int fw_buffer_index = 0;
 
     // Write new firmware size and version to Flash
     // Create 32 bit word for flash programming, version is at lower address, size is at higher address
