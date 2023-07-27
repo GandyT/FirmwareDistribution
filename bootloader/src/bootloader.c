@@ -382,11 +382,13 @@ void load_firmware(void){
         sig_base_index++;
     }
 
+    /*
     br_sha256_context* context;
     br_sha256_init(context);
     br_sha256_update(context, sig_base, sig_base_len); 
-    unsigned char output[FLASH_PAGESIZE];
+    unsigned char output[32];
     br_sha256_out(context, output);
+    */
     // int keySize = sizeof(rsaModulus) / sizeof(rsaModulus[0]);
     // uint8_t public_key[256 + keySize];
     // for (int i = 0; i < 256; i++){
