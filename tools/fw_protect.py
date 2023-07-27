@@ -34,9 +34,9 @@ def protect_firmware(infile, outfile, version, message):
     
     # Pack message, version and size into two little-endian shorts
 
-    firmware_and_message = pad(firmware + message.encode(), AES.block_size)
+    firmware_and_message = firmware + message.encode() + b'\00'
 
-    metadata = p16(len(firmware), endian = "little") + p16(version, endian = "little") + p16(len(message.encode()), endian = "little")
+    metadata = p16(len(firmware), endian = "little") + p16(version, endian = "little") + p16(len(message.encode())+1, endian = "little")
     
     #create an IV and hash metadata using HMAC
     IV = get_random_bytes(16)
@@ -52,9 +52,9 @@ def protect_firmware(infile, outfile, version, message):
     #Create the random IV and encrypt the firmware with AES in CBC mode
     cipher = AES.new(aes_key, AES.MODE_CBC, iv = IV)
 
-    protectedFirmware = cipher.encrypt(firmware_and_message)
+    protectedFirmware = cipher.encrypt(pad(firmware_and_message, AES.block_size))
     
-    firmware_blob = metadata + IV + MAC_tag + signature + protectedFirmware + b'\00' 
+    firmware_blob = metadata + IV + MAC_tag + signature + protectedFirmware
 
     # Write firmware blob to outfile
     with open(outfile, 'wb+') as outfile: #Original

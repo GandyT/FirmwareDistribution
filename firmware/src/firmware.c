@@ -9,7 +9,7 @@
 #include "util.h"
 #include "mitre_car.h"
 
-static const char *FLAG_RESPONSE = "Nice try.";
+static const char *FLAG_RESPONSE = "Nice twy.";
 
 void getFlag(char *flag)
 {

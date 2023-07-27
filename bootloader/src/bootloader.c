@@ -37,9 +37,9 @@ long program_flash(uint32_t, unsigned char *, unsigned int);
 #define FLASH_WRITESIZE 4
 
 // Protocol Constants
-#define METADATA ((uint8_t)0x00)
-#define MESSAGE ((uint8_t) 0x01)
-#define SIGNATURE ((uint8_t) 0x02)
+#define METADATA_CODE ((uint8_t)0x00)
+#define MESSAGE_CODE ((uint8_t) 0x01)
+#define SIGNATURE_CODE ((uint8_t) 0x02)
 #define OK ((uint8_t) 0x03)
 #define ERROR ((uint8_t) 0x04)
 
@@ -183,7 +183,6 @@ void reject() {
 }
 
 void load_firmware(void){
-    int frame_length = 0;
     int read = 0;
 
     uint32_t rcv = 0;
@@ -194,7 +193,7 @@ void load_firmware(void){
     uint32_t fw_size = 0; // size of firmware
     uint32_t rm_size = 0; // size of release message
     uint8_t msg_type = 4; // type of message
-    uint8_t iv[10]; // initialization vector for AES
+    uint8_t iv[16]; // initialization vector for AES
     uint8_t hmac_tag[32]; //hmac_tag 
     int fw_length = 0; // length of fw
     
@@ -208,7 +207,7 @@ void load_firmware(void){
     nl(UART2);
 
     /* CHECK IF MSG TYPE IS 0 */
-    if (msg_type != METADATA) {
+    if (msg_type != METADATA_CODE) {
         reject();
         return;
     }
@@ -265,19 +264,19 @@ void load_firmware(void){
     fw_length = rm_size + fw_size + (FRAME_SIZE - remaining);
     // account for padding
 
-    uint8_t fw_buffer[rm_size + fw_size + (FRAME_SIZE - remaining)];
+    uint8_t fw_buffer[fw_length];
     int fw_buffer_index = 0;
 
     uart_write(UART1, OK);
 
     /* GET IV (0x10 bytes) */
-    for (int i = 0; i < 0x10; i++) {
+    for (int i = 0; i < 16; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
         iv[i] = (uint8_t)rcv;
     }
 
     /* GET HMAC TAG (0x20 bytes) */
-    for (int i = 0; i < 0x20; i++) {
+    for (int i = 0; i < 32; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
         hmac_tag[i] = (uint8_t)rcv;
     }
@@ -295,9 +294,9 @@ void load_firmware(void){
         uart_write_hex(UART2, version);
         nl(UART2);
         
-        if (msg_type != MESSAGE) {
+        if (msg_type != MESSAGE_CODE) {
             
-            if (msg_type == SIGNATURE) break;
+            if (msg_type == SIGNATURE_CODE) break;
 
             reject();
             return;
@@ -318,11 +317,6 @@ void load_firmware(void){
     uart_write_hex(UART2, version);
     nl(UART2);
 
-    if (msg_type != SIGNATURE) {
-        reject();
-        return;
-    }
-
     /* READ 256 BYTES RSA SIGNATURE */
     uint8_t rsa_signature[256];
     for (int i = 0; i < 256; i++) {
@@ -333,9 +327,8 @@ void load_firmware(void){
     nl(UART2);
     uart_write(UART1, OK);
 
-    int buffer_size = sizeof(fw_buffer);
-
-    aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, buffer_size);
+    /* DECRYPTION */
+    // aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, fw_length);
 
     /* ATTEMPT TO VERIFY INTEGRITY OF SIGNATURE  */
     /* 
@@ -343,45 +336,6 @@ void load_firmware(void){
     ([firmware with releasemsg] + fw_size + version + rm_size + IV + HMAC tag)
     verify with rsaKey
     */
-
-    int sig_base_len = fw_size + rm_size + 0x2 + 0x2 + 0x2 + 0x10 + 0x32;
-    uint8_t sig_base[sig_base_len]; // the data used to generate the RSA Signature
-    int sig_base_index = 0;
-
-    for (int i = 0; i < fw_size + rm_size; ++i) {
-        sig_base[sig_base_index] = fw_buffer[i];
-        sig_base_index++;
-    }
-
-    /* add shorts */
-    uint8_t byte1 = (uint8_t) (fw_size && 0xFF);
-    uint8_t byte2 = (uint8_t) (fw_size << 8);
-
-    sig_base[sig_base_index++] = byte1;
-    sig_base[sig_base_index++] = byte2;
-
-    byte1 = (uint8_t) (version && 0xFF);
-    byte2 = (uint8_t) (version << 8);
-
-    sig_base[sig_base_index++] = byte1;
-    sig_base[sig_base_index++] = byte2;
-
-    byte1 = (uint8_t) (rm_size && 0xFF);
-    byte2 = (uint8_t) (rm_size << 8);
-
-    sig_base[sig_base_index++] = byte1;
-    sig_base[sig_base_index++] = byte2;
-
-    /* ADD TAGS */
-    for (int i = 0; i < 0x10; ++i) {
-        sig_base[sig_base_index] = iv[i];
-        sig_base_index++;
-    }
-
-    for (int i = 0; i < 0x20; ++i) {
-        sig_base[sig_base_index] = hmac_tag[i];
-        sig_base_index++;
-    }
 
     /* br_rsa_public_key pub_key = {rsaModulus, sizeof(rsaModulus), rsaExponent, sizeof(rsaExponent)}; */
 
