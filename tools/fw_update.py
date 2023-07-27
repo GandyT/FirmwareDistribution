@@ -94,10 +94,16 @@ def send_frame(ser, frame, debug=False):
 
 def send_signature(ser, signature, debug=False):
     message_type = RESP_SIGNATURE
-    ser.write(message_type + signature)
+    packed_signature = b""
+
+    for byte in signature:
+        packed_signature += p8(byte, endian="little")
+
+    ser.write(message_type + packed_signature)
 
     if debug:
-        print(message_type + "\n" + signature)
+        print(message_type)
+        print(packed_signature)
 
     resp = ser.read(1)
 

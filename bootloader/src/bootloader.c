@@ -314,6 +314,7 @@ void load_firmware(void){
     }
     uart_write_str(UART2, "Received RSA Signature: ");
     nl(UART2);
+    uart_write(UART1, OK);
        
     size_t data_len = sizeof(fw_buffer);
 
