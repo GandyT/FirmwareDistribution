@@ -230,7 +230,7 @@ void load_firmware(void){
     uart_write_hex(UART2, version);
     nl(UART2);
 
-    uint8_t fw_buffer[fw_size];
+    uint8_t fw_buffer[fw_size + rm_size];
     int fw_buffer_index = 0;
 
     /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
@@ -266,7 +266,7 @@ void load_firmware(void){
     // hmac_verified = verify_hmac(hmac_tag, firmware_data, fw_size);
 
     /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
-    for (int i = 0; i < 256; ++i) {
+    while (1) {
         /* WAIT FOR MESSAGE TYPE 1 */
         rcv = uart_read(UART1, BLOCKING, &read);
         msg_type = (uint8_t) rcv;
@@ -276,13 +276,20 @@ void load_firmware(void){
         nl(UART2);
         
         if (msg_type != MESSAGE) {
+            
+            if (msg_type == SIGNATURE) break;
+
             reject();
             return;
         }
 
-        for (int i = 0; i < frame_length; ++i) {
-            fw_buffer[fw_buffer_index] = uart_read(UART1, BLOCKING, &read);
-            fw_buffer_index += 1;
+        for (int i = 0; i < 256; ++i) {
+            rcv = uart_read(UART1, BLOCKING, &read);
+
+            if (fw_buffer_index < fw_size + rm_size) {
+                fw_buffer[fw_buffer_index] = (unint8_t) rcv;
+                fw_buffer_index += 1;
+            }
         }
 
         uart_write(UART1, OK);

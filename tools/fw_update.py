@@ -44,7 +44,7 @@ def send_metadata(ser, metadata, debug=False):
     version = u16(metadata[2:4], endian = "little")
     rm_size = u16(metadata[4:6], endian = "little")
     print(f"fw_size: {fw_size}\nVersion: {version}\nrm_size: {rm_size} bytes\n")
-
+    
     # Handshake for update
     ser.write(b"U")
 
@@ -60,8 +60,12 @@ def send_metadata(ser, metadata, debug=False):
     # ser.write(metadata[2:]) #temporary without bootloader
     #send complete BEGIN frame
     message_type = RESP_METADATA
+    packed_metadata = b""
 
-    ser.write(message_type + metadata)
+    for byte in metadata:
+        packed_metadata += p8(byte, endian="little")
+
+    ser.write(message_type + packed_metadata)
     
     # Wait for an OK from the bootloader.
     resp = ser.read(1)
@@ -127,11 +131,11 @@ def update(ser, infile, debug):
         frame_fmt = ">H{}s".format(FRAME_SIZE)
 
         #new frame construction with new bootloader
-        packed_data = struct.pack(frame_fmt, data)
-        print(len(packed_data))
+        packed_data = b""
+        for byte in data:
+            packed_data += p8(byte, endian="little")
         
-        frame = RESP_MESSAGE + packed_data
-        
+        frame = RESP_MESSAGE + data
 
         send_frame(ser, frame, debug=debug)
         print(f"Wrote frame {idx} ({len(frame)} bytes)")
