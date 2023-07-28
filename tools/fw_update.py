@@ -28,6 +28,7 @@ import time
 import socket
 
 from util import *
+from pwn import *
 
 from Crypto.Util.Padding import pad
 
@@ -38,10 +39,23 @@ RESP_OK = p8(3, endian="little")
 ZERO_BYTE = p8(0, endian="little")
 FRAME_SIZE = 256
 
+def get_bytes(byteString):
+    out = "{"
+
+    for i in range(len(byteString)):
+        if i == len(byteString) - 1:
+            
+            out += str(byteString[i])
+        else:
+
+            out += str(byteString[i]) + ", "
+    return out + "}"
+
 def send_metadata(ser, metadata, debug=False):
     fw_size = u16(metadata[:2], endian = "little")
     version = u16(metadata[2:4], endian = "little")
     rm_size = u16(metadata[4:6], endian = "little")
+    
     print(f"fw_size: {fw_size}\nVersion: {version}\nrm_size: {rm_size} bytes\n")
     
     # Handshake for update
@@ -126,16 +140,13 @@ def update(ser, infile, debug):
     firmware_message = firmware_blob[310:]
     send_metadata(ser, metadata_IV_tag, debug=debug)
 
-    send_metadata(ser, metadata, debug=debug)
-
-    for idx, frame_start in enumerate(range(0, len(firmware), FRAME_SIZE)):
-        data = firmware[frame_start : frame_start + FRAME_SIZE]
+    for idx, frame_start in enumerate(range(0, len(firmware_message), FRAME_SIZE)):
+        data = firmware_message[frame_start : frame_start + FRAME_SIZE]
 
         # Get length of data.
         # length = len(data)
         if len(data) < FRAME_SIZE:
             data = pad(data, FRAME_SIZE)
-        frame_fmt = ">H{}s".format(FRAME_SIZE)
 
         #new frame construction with new bootloader
         packed_data = b""
@@ -160,7 +171,6 @@ def update(ser, infile, debug):
     print(f"Finished Updating...")
 
     return ser
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Firmware Update Tool")

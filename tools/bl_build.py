@@ -28,6 +28,15 @@ HEADER_FILE = os.path.join(BOOTLOADER_DIR, "src/keys.h")
 # aes key
 # rsa private key
 
+def convert_to_array(name, byteString):
+    out = ""
+    for i in range(len(byteString)):
+        if i == len(byteString) - 1:
+            out += str(hex(byteString[i]))
+        else:
+            out += str(hex(byteString[i])) + ", "
+    return "const uint8_t " + name + "[" + str(len(byteString)) + "] = " + "{" + out + "};"
+
 def generate_keys():
     aes_key = get_random_bytes(16)
 
@@ -46,13 +55,7 @@ def generate_keys():
     # keys.h
     # aes key
     # rsa_public key
-    c_aes_key = "uint8_t aesKey[16] = {"
-    for i in range(len(aes_key)):
-        if i == len(aes_key) - 1:
-            c_aes_key += str(aes_key[i])
-        else:
-            c_aes_key += str(aes_key[i]) + ", "
-    c_aes_key += "};"
+    c_aes_key = convert_to_array("aesKey", aes_key)
 
     rsa_public_key = b"".join(rsa_public_key.split(b"\n"))
     startKey = b"-----BEGIN PUBLIC KEY-----"
@@ -62,31 +65,13 @@ def generate_keys():
     rsa_public_exponent = rsa_public_key[256:]
     rsa_public_key = rsa_public_key[:256]
 
-    c_rsa_public_key = "uint8_t rsaModulus[256] = {"
-    for i in range(len(rsa_public_key)):
-        if i == len(rsa_public_key):
-            c_rsa_public_key += str(rsa_public_key[i])
-        else:
-            c_rsa_public_key += str(rsa_public_key[i]) + ", "
-    c_rsa_public_key += "};"
+    c_rsa_public_key = convert_to_array("rsaModulus", rsa_public_key)
 
-    c_rsa_public_exponent = "uint8_t rsaExponent[" + str(len(rsa_public_exponent)) + "] = {"
-    for i in range(len(rsa_public_exponent)):
-        if i == len(rsa_public_exponent):
-            c_rsa_public_exponent += str(rsa_public_exponent[i])
-        else:
-            c_rsa_public_exponent += str(rsa_public_exponent[i]) + ", "
-    c_rsa_public_exponent += "};"
+    c_rsa_public_exponent = convert_to_array("rsaExponent", rsa_public_exponent)
 
-    c_hmac_key = "uint8_t hmacKey[32] = {"
-    for i in range(len(hmac_key)):
-        if i == len(hmac_key):
-            c_hmac_key += str(hmac_key[i])
-        else:
-            c_hmac_key += str(hmac_key[i]) + ", "
-    c_hmac_key += "};"
+    c_hmac_key = convert_to_array("hmacKey", hmac_key)
 
-    keysFile = c_aes_key + "\n" + c_rsa_public_key + "\n" + c_rsa_public_exponent + "\n" + c_hmac_key
+    keysFile = "#ifndef KEYS_H\n#define KEYS_H\n" + c_aes_key + "\n" + c_rsa_public_key + "\n" + c_rsa_public_exponent + "\n" + c_hmac_key + "\n#endif"
     f = open(HEADER_FILE, "w")
     f.write(keysFile)
         
@@ -130,6 +115,4 @@ if __name__ == "__main__":
     make_bootloader()
 
     # delete header file
-    os.remove(HEADER_FILE)
-    
-
+    # os.remove(HEADER_FILE)
