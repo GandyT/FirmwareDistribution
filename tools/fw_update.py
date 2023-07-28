@@ -37,7 +37,19 @@ RESP_MESSAGE = p8(1, endian="little")
 RESP_SIGNATURE = p8(2, endian="little")
 RESP_OK = p8(3, endian="little")
 ZERO_BYTE = p8(0, endian="little")
-FRAME_SIZE = 256
+FRAME_SIZE = 128
+
+def get_bytes(byteString):
+    out = "{"
+
+    for i in range(len(byteString)):
+        if i == len(byteString) - 1:
+            
+            out += str(byteString[i])
+        else:
+
+            out += str(byteString[i]) + ", "
+    return out + "}"
 
 def send_metadata(ser, metadata, debug=False):
     fw_size = u16(metadata[:2], endian = "little")
