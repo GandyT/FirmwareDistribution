@@ -147,6 +147,7 @@ def update(ser, infile, debug):
         # length = len(data)
         if len(data) < FRAME_SIZE:
             data = pad(data, FRAME_SIZE)
+            print("Added Padding to Frame")
 
         #new frame construction with new bootloader
         packed_data = b""

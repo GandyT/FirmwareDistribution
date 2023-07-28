@@ -64,8 +64,7 @@ def protect_firmware(infile, outfile, version, message):
     #Create the random IV and encrypt the firmware with AES in CBC mode
     cipher = AES.new(aes_key, AES.MODE_CBC, iv = IV)
 
-    # protectedFirmware = cipher.encrypt(pad(firmware_and_message, AES.block_size))
-    protectedFirmware = firmware_and_message
+    protectedFirmware = cipher.encrypt(pad(firmware_and_message, AES.block_size))
     
     firmware_blob = metadata + IV + MAC_tag + signature + protectedFirmware
 

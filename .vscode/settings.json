@@ -2,6 +2,7 @@
     "files.associations": {
         "stdio.h": "c",
         "beaverssl.h": "c",
-        "uart.h": "c"
+        "uart.h": "c",
+        "bearssl.h": "c"
     }
 }

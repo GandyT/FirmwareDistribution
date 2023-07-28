@@ -14,9 +14,13 @@
 
 // Library Imports
 #include <string.h>
+#include <beaverssl.h>
 
 // Application Imports
 #include "uart.h"
+
+// keys
+#include "keys.h"
 
 // Forward Declarations
 void load_initial_firmware(void);
@@ -49,8 +53,8 @@ extern int _binary_firmware_bin_start;
 extern int _binary_firmware_bin_size;
 
 // Device metadata
-uint16_t *fw_version_address = (uint16_t *)METADATA_BASE;
-uint16_t *fw_size_address = (uint16_t *)(METADATA_BASE + 2);
+const static uint16_t *fw_version_address = (uint16_t *)METADATA_BASE;
+const static uint16_t *fw_size_address = (uint16_t *)(METADATA_BASE + 2);
 uint8_t *fw_release_message_address;
 void uart_write_hex_bytes(uint8_t uart, uint8_t * start, uint32_t len);
 
@@ -182,6 +186,7 @@ void load_firmware(void){
     uint32_t fw_size = 0;
     uint32_t rm_size = 0; // size of release message
     uint32_t buffer_length = 0; // length of buffer
+    uint8_t iv[16];
     uint8_t msg_type = 5; // type of message
 
     /* GET MSG TYPE (0x1 bytes)*/
@@ -246,23 +251,23 @@ void load_firmware(void){
     
     buffer_length = rm_size + fw_size;
     // account for padding
-    int remaining = buffer_length % FRAME_SIZE;
-    buffer_length += remaining;
-
-
-    // manually set address of fw_buffer as not doing it manually overwrites the pointer to the pointer of the metadata
-    uint8_t* fw_buffer = (uint8_t*) 0x20001000;
-    int fw_buffer_index = 0;
+    int remaining = buffer_length % 16;
+    buffer_length += 16 - remaining;
 
     /* GET IV (0x10 bytes) */
     for (int i = 0; i < 16; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
+        iv[i] = (uint8_t) rcv;
     }
 
     /* GET HMAC TAG (0x20 bytes) */
     for (int i = 0; i < 32; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
     }
+
+    // manually set address of fw_buffer as not doing it manually overwrites the pointer to the pointer of the metadata
+    uint8_t* fw_buffer = (uint8_t*) 0x20002000;
+    int fw_buffer_index = 0;
 
     /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
     while (1) {
@@ -306,6 +311,9 @@ void load_firmware(void){
     uart_write_str(UART2, "Received RSA Signature: ");
     nl(UART2);
     uart_write(UART1, OK);
+
+    // decrypt
+    aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, buffer_length);
 
     buffer_length = fw_size + rm_size;
     fw_buffer_index = 0;
