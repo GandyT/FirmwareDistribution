@@ -62,7 +62,7 @@ def generate_keys():
     rsa_public_exponent = rsa_public_key[256:]
     rsa_public_key = rsa_public_key[:256]
 
-    c_rsa_public_key = "uint8_t rsaModulus[256] = {"
+    c_rsa_public_key = "const uint8_t rsaModulus[256] = {"
     for i in range(len(rsa_public_key)):
         if i == len(rsa_public_key):
             c_rsa_public_key += str(rsa_public_key[i])
@@ -70,7 +70,7 @@ def generate_keys():
             c_rsa_public_key += str(rsa_public_key[i]) + ", "
     c_rsa_public_key += "};"
 
-    c_rsa_public_exponent = "uint8_t rsaExponent[" + str(len(rsa_public_exponent)) + "] = {"
+    c_rsa_public_exponent = "const uint8_t rsaExponent[" + str(len(rsa_public_exponent)) + "] = {"
     for i in range(len(rsa_public_exponent)):
         if i == len(rsa_public_exponent):
             c_rsa_public_exponent += str(rsa_public_exponent[i])
@@ -78,7 +78,7 @@ def generate_keys():
             c_rsa_public_exponent += str(rsa_public_exponent[i]) + ", "
     c_rsa_public_exponent += "};"
 
-    c_hmac_key = "uint8_t hmacKey[32] = {"
+    c_hmac_key = "const uint8_t hmacKey[32] = {"
     for i in range(len(hmac_key)):
         if i == len(hmac_key):
             c_hmac_key += str(hmac_key[i])
@@ -86,7 +86,7 @@ def generate_keys():
             c_hmac_key += str(hmac_key[i]) + ", "
     c_hmac_key += "};"
 
-    keysFile = c_aes_key + "\n" + c_rsa_public_key + "\n" + c_rsa_public_exponent + "\n" + c_hmac_key
+    keysFile = "#ifndef KEYS_H\n#define KEYS_H\n" + c_aes_key + "\n" + c_rsa_public_key + "\n" + c_rsa_public_exponent + "\n" + c_hmac_key + "\n#endif"
     f = open(HEADER_FILE, "w")
     f.write(keysFile)
         
