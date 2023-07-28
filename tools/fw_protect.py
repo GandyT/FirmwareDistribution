@@ -17,6 +17,18 @@ from Crypto.Hash import HMAC, SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Signature import pkcs1_15
 
+def get_bytes(byteString):
+    out = "{"
+
+    for i in range(len(byteString)):
+        if i == len(byteString) - 1:
+            
+            out += str(hex(byteString[i]))
+        else:
+
+            out += str(hex(byteString[i])) + ", "
+    return out + "}"
+
 def protect_firmware(infile, outfile, version, message):
     # Load firmware binary from infile
     with open(infile, 'rb') as fp:
@@ -55,6 +67,9 @@ def protect_firmware(infile, outfile, version, message):
     protectedFirmware = cipher.encrypt(pad(firmware_and_message, AES.block_size))
     
     firmware_blob = metadata + IV + MAC_tag + signature + protectedFirmware
+
+    print("IV: " + get_bytes(IV))
+    print("HMAC Tag: " + get_bytes(MAC_tag))
 
     # Write firmware blob to outfile
     with open(outfile, 'wb+') as outfile: #Original

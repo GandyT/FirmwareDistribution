@@ -43,6 +43,7 @@ def send_metadata(ser, metadata, debug=False):
     fw_size = u16(metadata[:2], endian = "little")
     version = u16(metadata[2:4], endian = "little")
     rm_size = u16(metadata[4:6], endian = "little")
+    
     print(f"fw_size: {fw_size}\nVersion: {version}\nrm_size: {rm_size} bytes\n")
     
     # Handshake for update
@@ -134,7 +135,6 @@ def update(ser, infile, debug):
         # length = len(data)
         if len(data) < FRAME_SIZE:
             data = pad(data, FRAME_SIZE)
-        frame_fmt = ">H{}s".format(FRAME_SIZE)
 
         #new frame construction with new bootloader
         packed_data = b""
