@@ -29,6 +29,11 @@ def get_bytes(byteString):
             out += str(hex(byteString[i])) + ", "
     return out + "}"
 
+def generate_bad_private_key():
+    rsa = RSA.generate(2048)
+
+    return rsa
+
 def protect_firmware(infile, outfile, version, message):
     # Load firmware binary from infile
     with open(infile, 'rb') as fp:
@@ -59,6 +64,7 @@ def protect_firmware(infile, outfile, version, message):
     #create a signature for the firmware prior to encryption
     pre_hash = firmware
     hash_func = SHA256.new(pre_hash)
+    # bad_private_key = generate_bad_private_key() # used for testing
     signature = pkcs1_15.new(private_key).sign(hash_func)
     
     #Create the random IV and encrypt the firmware with AES in CBC mode
