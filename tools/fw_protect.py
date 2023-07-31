@@ -57,7 +57,7 @@ def protect_firmware(infile, outfile, version, message):
     MAC_tag = h.digest()
     
     #create a signature for the firmware prior to encryption
-    pre_hash = firmware_and_message + metadata + IV + MAC_tag
+    pre_hash = firmware
     hash_func = SHA256.new(pre_hash)
     signature = pkcs1_15.new(private_key).sign(hash_func)
     
@@ -65,11 +65,16 @@ def protect_firmware(infile, outfile, version, message):
     cipher = AES.new(aes_key, AES.MODE_CBC, iv = IV)
 
     protectedFirmware = cipher.encrypt(pad(firmware_and_message, AES.block_size))
+
+    # replace metadata with bad metadata for HMAC test
+    # metadata = p16(len(firmware), endian = "little") + p16(5, endian = "little") + p16(len(message.encode())+1, endian = "little")
     
     firmware_blob = metadata + IV + MAC_tag + signature + protectedFirmware
 
     print("IV: " + get_bytes(IV))
     print("HMAC Tag: " + get_bytes(MAC_tag))
+    print("RSA Hash Base: " + get_bytes(hash_func.digest()))
+    print("RSA Signature: " + get_bytes(signature))
 
     # Write firmware blob to outfile
     with open(outfile, 'wb+') as outfile: #Original

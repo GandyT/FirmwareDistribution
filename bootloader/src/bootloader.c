@@ -15,6 +15,7 @@
 // Library Imports
 #include <string.h>
 #include <beaverssl.h>
+#include <bearssl.h>
 
 // Application Imports
 #include "uart.h"
@@ -186,6 +187,7 @@ void load_firmware(void){
     uint32_t fw_size = 0;
     uint32_t rm_size = 0; // size of release message
     uint32_t buffer_length = 0; // length of buffer
+    uint8_t rsa_signature[256];
     uint8_t iv[16];
     char hmac_tag[0x20];
     uint8_t msg_type = 5; // type of message
@@ -365,6 +367,7 @@ void load_firmware(void){
     /* READ 256 BYTES RSA SIGNATURE */
     for (int i = 0; i < 256; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
+        rsa_signature[i] = (uint8_t)rcv;
     }
     uart_write_str(UART2, "Received RSA Signature: ");
     nl(UART2);
@@ -372,6 +375,25 @@ void load_firmware(void){
 
     // decrypt
     aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, buffer_length);
+
+    unsigned char fw_hash[32];
+    sha_hash((unsigned char*) fw_buffer, fw_size, fw_hash);
+
+    // attempt to verify RSA signature
+    br_rsa_public_key pub_key = {.n = rsaModulus, .nlen = sizeof(rsaModulus), .e = rsaExponent, .elen = sizeof(rsaExponent)};
+    int result = br_rsa_i15_pkcs1_vrfy(
+        rsa_signature, // const unsigned char *x - (signature buffer)
+        sizeof(rsa_signature), // size_t xlen - (signature length in bytes)
+        BR_HASH_OID_SHA256, // const unsigned char *hash_oid - (OID of hash)
+        sizeof(fw_hash), // expected hash value length - (in bytes).
+        &pub_key, // const br_rsa_public_key *pk - RSA public key.
+        fw_hash // unsigned char *hash_out - output buffer for the hash value
+    );
+
+    if (result == 0){
+        reject();
+        return;
+    }
 
     buffer_length = fw_size + rm_size;
     fw_buffer_index = 0;

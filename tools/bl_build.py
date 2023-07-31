@@ -28,14 +28,20 @@ HEADER_FILE = os.path.join(BOOTLOADER_DIR, "src/keys.h")
 # aes key
 # rsa private key
 
-def convert_to_array(name, byteString):
+def convert_to_array(name, byteString, isChar=False):
     out = ""
     for i in range(len(byteString)):
         if i == len(byteString) - 1:
             out += str(hex(byteString[i]))
         else:
             out += str(hex(byteString[i])) + ", "
-    return "const uint8_t " + name + "[" + str(len(byteString)) + "] = " + "{" + out + "};"
+    datatype = ""
+    if isChar:
+        datatype = "const unsigned char "
+    else:
+        datatype = "const uint8_t "
+
+    return datatype + name + "[" + str(len(byteString)) + "] = " + "{" + out + "};"
 
 def generate_keys():
     aes_key = get_random_bytes(16)
@@ -43,7 +49,7 @@ def generate_keys():
     rsa = RSA.generate(2048)
 
     rsa_private_key = rsa.export_key("PEM")
-    rsa_public_key = rsa.publickey().export_key()
+    rsa_public_key = rsa.publickey()
 
     hmac_key = get_random_bytes(32)
 
@@ -57,21 +63,16 @@ def generate_keys():
     # rsa_public key
     c_aes_key = convert_to_array("aesKey", aes_key)
 
-    rsa_public_key = b"".join(rsa_public_key.split(b"\n"))
-    startKey = b"-----BEGIN PUBLIC KEY-----"
-    endKey = b"-----END PUBLIC KEY-----"
-    rsa_public_key = rsa_public_key[len(startKey):-len(endKey)]
+    rsa_public_modulus = rsa_public_key.n.to_bytes(256, "big")
+    rsa_public_exponent = rsa_public_key.e.to_bytes(3, "big")
 
-    rsa_public_exponent = rsa_public_key[256:]
-    rsa_public_key = rsa_public_key[:256]
+    c_rsa_modulus = convert_to_array("rsaModulus", rsa_public_modulus, True)
 
-    c_rsa_public_key = convert_to_array("rsaModulus", rsa_public_key)
-
-    c_rsa_public_exponent = convert_to_array("rsaExponent", rsa_public_exponent)
+    c_rsa_public_exponent = convert_to_array("rsaExponent", rsa_public_exponent, True)
 
     c_hmac_key = convert_to_array("hmacKey", hmac_key)
 
-    keysFile = "#ifndef KEYS_H\n#define KEYS_H\n" + c_aes_key + "\n" + c_rsa_public_key + "\n" + c_rsa_public_exponent + "\n" + c_hmac_key + "\n#endif"
+    keysFile = "#ifndef KEYS_H\n#define KEYS_H\n" + c_aes_key + "\n" + c_rsa_modulus + "\n" + c_rsa_public_exponent + "\n" + c_hmac_key + "\n#endif"
     f = open(HEADER_FILE, "w")
     f.write(keysFile)
         
