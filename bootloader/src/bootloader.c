@@ -43,6 +43,7 @@ long program_flash(uint32_t, unsigned char *, unsigned int);
 #define SIGNATURE_CODE ((unsigned char) 0x02)
 #define OK ((unsigned char)0x03)
 #define ERROR ((unsigned char)0x04)
+#define FAILED_WRITE ((unsigned char) 0x05)
 #define UPDATE ((unsigned char)'U')
 #define BOOT ((unsigned char)'B')
 
@@ -189,7 +190,7 @@ void load_firmware(void){
     uint32_t buffer_length = 0; // length of buffer
     uint8_t rsa_signature[256];
     uint8_t iv[16];
-    char hmac_tag[0x20];
+    char hmac_tag[32];
     uint8_t msg_type = 5; // type of message
 
     /* GET MSG TYPE (0x1 bytes)*/
@@ -275,7 +276,7 @@ void load_firmware(void){
         hmac_tag[i] = (char) rcv;
     }
 
-    int meta_IV_len = 0x2 + 0x2 + 0x2 + 0x10;
+    int meta_IV_len = 2 + 2 + 2 + 16;
     uint8_t meta_IV[meta_IV_len]; // the data used to generate the HMAC tag
     int meta_IV_index = 0;
 
@@ -302,18 +303,18 @@ void load_firmware(void){
     meta_IV_index++;
 
     /* ADD TAGS */
-    for (int i = 0; i < 0x10; ++i) {
+    for (int i = 0; i < 16; ++i) {
         meta_IV[meta_IV_index] = iv[i];
         meta_IV_index++;
     }
 
     //Create array for new hmac_tag based on data
-    uint8_t new_tag[0x20];
-    sha_hmac((char*) hmacKey, 0x20, (char*) meta_IV, meta_IV_len, (char*) new_tag);
+    uint8_t new_tag[32];
+    sha_hmac((char*) hmacKey, 32, (char*) meta_IV, meta_IV_len, (char*) new_tag);
     
     //Verify the new tag with the old tag
     int same = 1;
-    for (int i = 0; i < 0x20; i++){
+    for (int i = 0; i < 32; i++){
         if(new_tag[i] != hmac_tag[i]){
             same = 0;
             break;
@@ -379,8 +380,12 @@ void load_firmware(void){
     unsigned char fw_hash[32];
     sha_hash((unsigned char*) fw_buffer, fw_size, fw_hash);
 
-    // attempt to verify RSA signature
-    br_rsa_public_key pub_key = {.n = rsaModulus, .nlen = sizeof(rsaModulus), .e = rsaExponent, .elen = sizeof(rsaExponent)};
+    br_rsa_public_key pub_key;
+    pub_key.n = rsaModulus;
+    pub_key.nlen = sizeof(rsaModulus);
+    pub_key.e = rsaExponent;
+    pub_key.elen = sizeof(rsaExponent);
+    
     int result = br_rsa_i15_pkcs1_vrfy(
         rsa_signature, // const unsigned char *x - (signature buffer)
         sizeof(rsa_signature), // size_t xlen - (signature length in bytes)
@@ -428,7 +433,8 @@ void load_firmware(void){
             // Verify flash program
             if (memcmp(data, (void *) page_addr, data_index) != 0){
                 uart_write_str(UART2, "Flash check failed.\n");
-                reject();
+                uart_write(UART1, FAILED_WRITE);
+                SysCtlReset(); // Reset device
                 return;
             }
 
