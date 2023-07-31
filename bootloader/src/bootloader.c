@@ -55,13 +55,13 @@ extern int _binary_firmware_bin_start;
 extern int _binary_firmware_bin_size;
 
 // Device metadata
-const static uint16_t *fw_version_address = (uint16_t *)METADATA_BASE;
-const static uint16_t *fw_size_address = (uint16_t *)(METADATA_BASE + 2);
+#define fw_version_address METADATA_BASE;
+#define fw_size_address (METADATA_BASE + 2);
 uint8_t *fw_release_message_address;
 void uart_write_hex_bytes(uint8_t uart, uint8_t * start, uint32_t len);
 
 // Firmware Buffer
-unsigned char data[FLASH_PAGESIZE];
+// unsigned char data[FLASH_PAGESIZE];
 
 int main(void){
 
@@ -192,6 +192,7 @@ void load_firmware(void){
     uint8_t iv[16];
     char hmac_tag[32];
     uint8_t msg_type = 5; // type of message
+    unsigned char* data = (unsigned char*) 0x20002000;
 
     /* GET MSG TYPE (0x1 bytes)*/
     rcv = uart_read(UART1, BLOCKING, &read);
@@ -234,7 +235,8 @@ void load_firmware(void){
     rm_size |= (uint32_t)rcv << 8;
 
     // Compare to old version and abort if older (note special case for version 0).
-    uint16_t old_version = *fw_version_address;
+    uint16_t* fw_ver_ad = (uint16_t*) fw_version_address;
+    uint16_t old_version = *(fw_ver_ad);
 
     if (version != 0 && version < old_version){
         reject();
@@ -327,7 +329,7 @@ void load_firmware(void){
     }
 
     // manually set address of fw_buffer as not doing it manually overwrites the pointer to the pointer of the metadata
-    uint8_t* fw_buffer = (uint8_t*) 0x20002000;
+    uint8_t* fw_buffer = (uint8_t*) 0x20005000;
     int fw_buffer_index = 0;
 
     /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
@@ -507,7 +509,8 @@ long program_flash(uint32_t page_addr, unsigned char *data, unsigned int data_le
 
 void boot_firmware(void){
     // compute the release message address, and then print it
-    uint16_t fw_size = *fw_size_address;
+    uint16_t *fw_siz_ad = (uint16_t*) fw_size_address;
+    uint16_t fw_size = *fw_siz_ad;
     fw_release_message_address = (uint8_t *)(FW_BASE + fw_size);
     uart_write_str(UART2, (char *)fw_release_message_address);
 
