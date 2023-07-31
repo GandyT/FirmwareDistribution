@@ -187,6 +187,7 @@ void load_firmware(void){
     uint32_t rm_size = 0; // size of release message
     uint32_t buffer_length = 0; // length of buffer
     uint8_t iv[16];
+    char hmac_tag[0x20];
     uint8_t msg_type = 5; // type of message
 
     /* GET MSG TYPE (0x1 bytes)*/
@@ -237,15 +238,21 @@ void load_firmware(void){
         return;
     }
 
+    int debug = 0;
     if (version == 0){
         // If debug firmware, don't change version
         version = old_version;
+        debug = 1;
     }
 
     // Write new firmware size and version to Flash
     // Create 32 bit word for flash programming, version is at lower address, size is at higher address
     uint32_t metadata = ((fw_size & 0xFFFF) << 16) | (version & 0xFFFF);
     program_flash(METADATA_BASE, (uint8_t *)(&metadata), 4);
+
+    if (debug) {
+        version = 0; // set version back to 0 after writing
+    }
 
     uart_write(UART1, OK); // Acknowledge the metadata.
     
@@ -261,10 +268,59 @@ void load_firmware(void){
     }
 
     /* GET HMAC TAG (0x20 bytes) */
-    uint8_t hmac_tag[0x20];
     for (int i = 0; i < 32; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
-        hmac_tag[i] = (uint8_t)rcv;
+        hmac_tag[i] = (char) rcv;
+    }
+
+    int meta_IV_len = 0x2 + 0x2 + 0x2 + 0x10;
+    uint8_t meta_IV[meta_IV_len]; // the data used to generate the HMAC tag
+    int meta_IV_index = 0;
+
+    /* add shorts */
+    uint8_t byte1 = (uint8_t) (fw_size); // fw_size
+    uint8_t byte2 = (uint8_t) (fw_size >> 8);
+    meta_IV[meta_IV_index] = byte1;
+    meta_IV_index++;
+    meta_IV[meta_IV_index] = byte2;
+    meta_IV_index++;
+
+    byte1 = (uint8_t) (version); // fw_version
+    byte2 = (uint8_t) (version >> 8);
+    meta_IV[meta_IV_index] = byte1;
+    meta_IV_index++;
+    meta_IV[meta_IV_index] = byte2;
+    meta_IV_index++;
+
+    byte1 = (uint8_t) (rm_size); // rm_size
+    byte2 = (uint8_t) (rm_size >> 8);
+    meta_IV[meta_IV_index] = byte1;
+    meta_IV_index++;
+    meta_IV[meta_IV_index] = byte2;
+    meta_IV_index++;
+
+    /* ADD TAGS */
+    for (int i = 0; i < 0x10; ++i) {
+        meta_IV[meta_IV_index] = iv[i];
+        meta_IV_index++;
+    }
+
+    //Create array for new hmac_tag based on data
+    uint8_t new_tag[0x20];
+    sha_hmac((char*) hmacKey, 0x20, (char*) meta_IV, meta_IV_len, (char*) new_tag);
+    
+    //Verify the new tag with the old tag
+    int same = 1;
+    for (int i = 0; i < 0x20; i++){
+        if(new_tag[i] != hmac_tag[i]){
+            same = 0;
+            break;
+        }
+    }
+
+    if (same == 0){
+        reject();
+        return;
     }
 
     // manually set address of fw_buffer as not doing it manually overwrites the pointer to the pointer of the metadata
@@ -316,46 +372,6 @@ void load_firmware(void){
 
     // decrypt
     aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, buffer_length);
-
-    int meta_IV_len = 0x2 + 0x2 + 0x2 + 0x10;
-    char meta_IV[meta_IV_len]; // the data used to generate the RSA Signature
-    int meta_IV_index = 0;
-
-    /* add shorts */
-    uint8_t byte1 = (uint8_t) (fw_size && 0xFF);
-    uint8_t byte2 = (uint8_t) (fw_size << 8);
-    meta_IV[meta_IV_index++] = byte1;
-    meta_IV[meta_IV_index++] = byte2;
-    byte1 = (uint8_t) (version && 0xFF);
-    byte2 = (uint8_t) (version << 8);
-    meta_IV[meta_IV_index++] = byte1;
-    meta_IV[meta_IV_index++] = byte2;
-    byte1 = (uint8_t) (rm_size && 0xFF);
-    byte2 = (uint8_t) (rm_size << 8);
-    meta_IV[meta_IV_index++] = byte1;
-    meta_IV[meta_IV_index++] = byte2;
-    /* ADD TAGS */
-    for (int i = 0; i < 0x10; ++i) {
-        meta_IV[meta_IV_index] = iv[i];
-        meta_IV_index++;
-    }
-
-    //Create array for new hmac_tag based on data
-    char new_tag[0x20];
-    sha_hmac(hmacKey, 0x20, meta_IV, (sizeof(meta_IV) / sizeof(meta_IV[0])), new_tag);
-    
-    //Verify the new tag with the old tag
-    int same = 1;
-    for (int i = 0; i < 0x20; i++){
-        if(new_tag[i] != hmac_tag[i]){
-            same = 0;
-        }
-    }
-    if (same == 0){
-        reject();
-        return;
-    }
-
 
     buffer_length = fw_size + rm_size;
     fw_buffer_index = 0;
