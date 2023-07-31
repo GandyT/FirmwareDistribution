@@ -261,8 +261,10 @@ void load_firmware(void){
     }
 
     /* GET HMAC TAG (0x20 bytes) */
+    uint8_t hmac_tag[0x20];
     for (int i = 0; i < 32; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
+        hmac_tag[i] = (uint8_t)rcv;
     }
 
     // manually set address of fw_buffer as not doing it manually overwrites the pointer to the pointer of the metadata
@@ -314,6 +316,46 @@ void load_firmware(void){
 
     // decrypt
     aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, buffer_length);
+
+    int meta_IV_len = 0x2 + 0x2 + 0x2 + 0x10;
+    char meta_IV[meta_IV_len]; // the data used to generate the RSA Signature
+    int meta_IV_index = 0;
+
+    /* add shorts */
+    uint8_t byte1 = (uint8_t) (fw_size && 0xFF);
+    uint8_t byte2 = (uint8_t) (fw_size << 8);
+    meta_IV[meta_IV_index++] = byte1;
+    meta_IV[meta_IV_index++] = byte2;
+    byte1 = (uint8_t) (version && 0xFF);
+    byte2 = (uint8_t) (version << 8);
+    meta_IV[meta_IV_index++] = byte1;
+    meta_IV[meta_IV_index++] = byte2;
+    byte1 = (uint8_t) (rm_size && 0xFF);
+    byte2 = (uint8_t) (rm_size << 8);
+    meta_IV[meta_IV_index++] = byte1;
+    meta_IV[meta_IV_index++] = byte2;
+    /* ADD TAGS */
+    for (int i = 0; i < 0x10; ++i) {
+        meta_IV[meta_IV_index] = iv[i];
+        meta_IV_index++;
+    }
+
+    //Create array for new hmac_tag based on data
+    char new_tag[0x20];
+    sha_hmac(hmacKey, 0x20, meta_IV, (sizeof(meta_IV) / sizeof(meta_IV[0])), new_tag);
+    
+    //Verify the new tag with the old tag
+    int same = 1;
+    for (int i = 0; i < 0x20; i++){
+        if(new_tag[i] != hmac_tag[i]){
+            same = 0;
+        }
+    }
+    if (same == 0){
+        reject();
+        return;
+    }
+
 
     buffer_length = fw_size + rm_size;
     fw_buffer_index = 0;
