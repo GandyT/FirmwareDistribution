@@ -15,6 +15,7 @@
 // Library Imports
 #include <string.h>
 #include <beaverssl.h>
+#include <bearssl.h>
 
 // Application Imports
 #include "uart.h"
@@ -42,6 +43,7 @@ long program_flash(uint32_t, unsigned char *, unsigned int);
 #define SIGNATURE_CODE ((unsigned char) 0x02)
 #define OK ((unsigned char)0x03)
 #define ERROR ((unsigned char)0x04)
+#define FAILED_WRITE ((unsigned char) 0x05)
 #define UPDATE ((unsigned char)'U')
 #define BOOT ((unsigned char)'B')
 
@@ -53,13 +55,13 @@ extern int _binary_firmware_bin_start;
 extern int _binary_firmware_bin_size;
 
 // Device metadata
-const static uint16_t *fw_version_address = (uint16_t *)METADATA_BASE;
-const static uint16_t *fw_size_address = (uint16_t *)(METADATA_BASE + 2);
+#define fw_version_address METADATA_BASE;
+#define fw_size_address (METADATA_BASE + 2);
 uint8_t *fw_release_message_address;
 void uart_write_hex_bytes(uint8_t uart, uint8_t * start, uint32_t len);
 
 // Firmware Buffer
-unsigned char data[FLASH_PAGESIZE];
+// unsigned char data[FLASH_PAGESIZE];
 
 int main(void){
 
@@ -186,9 +188,11 @@ void load_firmware(void){
     uint32_t fw_size = 0;
     uint32_t rm_size = 0; // size of release message
     uint32_t buffer_length = 0; // length of buffer
+    uint8_t rsa_signature[256];
     uint8_t iv[16];
-    char hmac_tag[0x20];
+    char hmac_tag[32];
     uint8_t msg_type = 5; // type of message
+    unsigned char* data = (unsigned char*) 0x20002000;
 
     /* GET MSG TYPE (0x1 bytes)*/
     rcv = uart_read(UART1, BLOCKING, &read);
@@ -231,7 +235,8 @@ void load_firmware(void){
     rm_size |= (uint32_t)rcv << 8;
 
     // Compare to old version and abort if older (note special case for version 0).
-    uint16_t old_version = *fw_version_address;
+    uint16_t* fw_ver_ad = (uint16_t*) fw_version_address;
+    uint16_t old_version = *(fw_ver_ad);
 
     if (version != 0 && version < old_version){
         reject();
@@ -273,7 +278,7 @@ void load_firmware(void){
         hmac_tag[i] = (char) rcv;
     }
 
-    int meta_IV_len = 0x2 + 0x2 + 0x2 + 0x10;
+    int meta_IV_len = 2 + 2 + 2 + 16;
     uint8_t meta_IV[meta_IV_len]; // the data used to generate the HMAC tag
     int meta_IV_index = 0;
 
@@ -300,18 +305,18 @@ void load_firmware(void){
     meta_IV_index++;
 
     /* ADD TAGS */
-    for (int i = 0; i < 0x10; ++i) {
+    for (int i = 0; i < 16; ++i) {
         meta_IV[meta_IV_index] = iv[i];
         meta_IV_index++;
     }
 
     //Create array for new hmac_tag based on data
-    uint8_t new_tag[0x20];
-    sha_hmac((char*) hmacKey, 0x20, (char*) meta_IV, meta_IV_len, (char*) new_tag);
+    uint8_t new_tag[32];
+    sha_hmac((char*) hmacKey, 32, (char*) meta_IV, meta_IV_len, (char*) new_tag);
     
     //Verify the new tag with the old tag
     int same = 1;
-    for (int i = 0; i < 0x20; i++){
+    for (int i = 0; i < 32; i++){
         if(new_tag[i] != hmac_tag[i]){
             same = 0;
             break;
@@ -324,7 +329,7 @@ void load_firmware(void){
     }
 
     // manually set address of fw_buffer as not doing it manually overwrites the pointer to the pointer of the metadata
-    uint8_t* fw_buffer = (uint8_t*) 0x20002000;
+    uint8_t* fw_buffer = (uint8_t*) 0x20005000;
     int fw_buffer_index = 0;
 
     /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
@@ -365,6 +370,7 @@ void load_firmware(void){
     /* READ 256 BYTES RSA SIGNATURE */
     for (int i = 0; i < 256; i++) {
         rcv = uart_read(UART1, BLOCKING, &read);
+        rsa_signature[i] = (uint8_t)rcv;
     }
     uart_write_str(UART2, "Received RSA Signature: ");
     nl(UART2);
@@ -372,6 +378,29 @@ void load_firmware(void){
 
     // decrypt
     aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, buffer_length);
+
+    unsigned char fw_hash[32];
+    sha_hash((unsigned char*) fw_buffer, fw_size, fw_hash);
+
+    br_rsa_public_key pub_key;
+    pub_key.n = rsaModulus;
+    pub_key.nlen = sizeof(rsaModulus);
+    pub_key.e = rsaExponent;
+    pub_key.elen = sizeof(rsaExponent);
+    
+    int result = br_rsa_i15_pkcs1_vrfy(
+        rsa_signature, // const unsigned char *x - (signature buffer)
+        sizeof(rsa_signature), // size_t xlen - (signature length in bytes)
+        BR_HASH_OID_SHA256, // const unsigned char *hash_oid - (OID of hash)
+        sizeof(fw_hash), // expected hash value length - (in bytes).
+        &pub_key, // const br_rsa_public_key *pk - RSA public key.
+        fw_hash // unsigned char *hash_out - output buffer for the hash value
+    );
+
+    if (result == 0){
+        reject();
+        return;
+    }
 
     buffer_length = fw_size + rm_size;
     fw_buffer_index = 0;
@@ -406,7 +435,8 @@ void load_firmware(void){
             // Verify flash program
             if (memcmp(data, (void *) page_addr, data_index) != 0){
                 uart_write_str(UART2, "Flash check failed.\n");
-                reject();
+                uart_write(UART1, FAILED_WRITE);
+                SysCtlReset(); // Reset device
                 return;
             }
 
@@ -479,7 +509,8 @@ long program_flash(uint32_t page_addr, unsigned char *data, unsigned int data_le
 
 void boot_firmware(void){
     // compute the release message address, and then print it
-    uint16_t fw_size = *fw_size_address;
+    uint16_t *fw_siz_ad = (uint16_t*) fw_size_address;
+    uint16_t fw_size = *fw_siz_ad;
     fw_release_message_address = (uint8_t *)(FW_BASE + fw_size);
     uart_write_str(UART2, (char *)fw_release_message_address);
 
