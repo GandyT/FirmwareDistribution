@@ -42,7 +42,6 @@ It will also create two files
   - The core feature is to append a version number and release (boot) message to the firmware binary.
 - fw_protect.py will take the firmware binary as an input and output the secure version.
 
-
 ## fw_update.py
 - **fw_update.py** is responsible for transferring and updating new firmware to the microcontroller.
   - Ensures the device’s software is up-to-date and facilitates the process
