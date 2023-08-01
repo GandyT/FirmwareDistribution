@@ -44,6 +44,7 @@ It will also create two files
 
 ## Used Libraries
 - BearSSL
+- BeaverSSL
 - PyCryptoDome
 
 ## Troubleshooting
