@@ -93,7 +93,7 @@ AFLAGS=-mthumb         \
 #
 CFLAGS=-mthumb             \
        -mcpu=cortex-m3     \
-	   -Os                 \
+       -Os                 \
        -ffunction-sections \
        -fdata-sections     \
        -MD                 \
