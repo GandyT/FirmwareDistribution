@@ -198,7 +198,7 @@ void load_firmware(void){
     msg_type = (uint8_t) rcv;
 
     uart_write_str(UART2, "Received Message Type: ");
-    uart_write_hex(UART2, version);
+    uart_write_hex(UART2, msg_type);
     nl(UART2);
 
     /* CHECK IF MSG TYPE IS 0 */
@@ -372,19 +372,24 @@ void load_firmware(void){
     }
     uart_write_str(UART2, "Received RSA Signature: ");
     nl(UART2);
-    uart_write(UART1, OK);
 
     // decrypt
     aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, buffer_length);
 
+    /*
     unsigned char fw_hash[32];
     sha_hash((unsigned char*) fw_buffer, fw_size, fw_hash);
 
     br_rsa_public_key pub_key;
-    pub_key.n = rsaModulus;
+    pub_key.n = (unsigned char*) 0x20004000;
     pub_key.nlen = sizeof(rsaModulus);
-    pub_key.e = rsaExponent;
+    pub_key.e = (unsigned char*) 0x20004500;
     pub_key.elen = sizeof(rsaExponent);
+
+    memcpy(pub_key.n, rsaModulus, pub_key.nlen);
+    memcpy(pub_key.e, rsaExponent, pub_key.elen);
+
+    
     
     int result = br_rsa_i15_pkcs1_vrfy(
         rsa_signature, // const unsigned char *x - (signature buffer)
@@ -399,6 +404,9 @@ void load_firmware(void){
         reject();
         return;
     }
+    */
+
+    uart_write(UART1, OK);
 
     buffer_length = fw_size + rm_size;
     fw_buffer_index = 0;
@@ -430,8 +438,17 @@ void load_firmware(void){
                 return;
             }
 
+            int unequal = 0;
+            for (int k = 0; k < data_index; ++k) {
+                unsigned char* addr = ((unsigned char*) page_addr + k);
+                if (data[k] != *addr) {
+                    unequal = 1;
+                    break;
+                }
+            }
+            
             // Verify flash program
-            if (memcmp(data, (void *) page_addr, data_index) != 0){
+            if (unequal){
                 uart_write_str(UART2, "Flash check failed.\n");
                 uart_write(UART1, FAILED_WRITE);
                 SysCtlReset(); // Reset device
