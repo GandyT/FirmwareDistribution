@@ -55,8 +55,12 @@ extern int _binary_firmware_bin_start;
 extern int _binary_firmware_bin_size;
 
 // Device metadata
+#define fw_version_address METADATA_BASE;
+#define fw_size_address (METADATA_BASE + 2);
+/*
 uint16_t* fw_version_address = (uint16_t*) METADATA_BASE;
 uint16_t* fw_size_address = (uint16_t*) (METADATA_BASE + 2);
+*/
 uint8_t *fw_release_message_address;
 void uart_write_hex_bytes(uint8_t uart, uint8_t * start, uint32_t len);
 
@@ -192,6 +196,7 @@ void load_firmware(void){
     uint8_t iv[16];
     char hmac_tag[32];
     uint8_t msg_type = 5; // type of message
+    // unsigned char* data = (unsigned char*) 0x20002000;
 
     /* GET MSG TYPE (0x1 bytes)*/
     rcv = uart_read(UART1, BLOCKING, &read);
@@ -234,7 +239,9 @@ void load_firmware(void){
     rm_size |= (uint32_t)rcv << 8;
 
     // Compare to old version and abort if older (note special case for version 0).
-    uint16_t old_version = *fw_version_address;
+    // uint16_t old_version = *fw_version_address;
+    uint16_t* fw_ver_ad = (uint16_t*) fw_version_address;
+    uint16_t old_version = *(fw_ver_ad);
 
     if (version != 0 && version < old_version){
         reject();
@@ -438,6 +445,7 @@ void load_firmware(void){
                 return;
             }
 
+            /*
             int unequal = 0;
             for (int k = 0; k < data_index; ++k) {
                 unsigned char* addr = ((unsigned char*) page_addr + k);
@@ -446,9 +454,11 @@ void load_firmware(void){
                     break;
                 }
             }
+            */
+
             
             // Verify flash program
-            if (unequal){
+            if (memcmp(data, (void *) page_addr, data_index) != 0){
                 uart_write_str(UART2, "Flash check failed.\n");
                 uart_write(UART1, FAILED_WRITE);
                 SysCtlReset(); // Reset device
@@ -524,7 +534,10 @@ long program_flash(uint32_t page_addr, unsigned char *data, unsigned int data_le
 
 void boot_firmware(void){
     // compute the release message address, and then print it
-    uint16_t fw_size = *fw_size_address;
+    uint16_t *fw_siz_ad = (uint16_t*) fw_size_address;
+    uint16_t fw_size = *fw_siz_ad;
+
+    // uint16_t fw_size = *fw_size_address;
     fw_release_message_address = (uint8_t *)(FW_BASE + fw_size);
     uart_write_str(UART2, (char *)fw_release_message_address);
 
