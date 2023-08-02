@@ -403,20 +403,17 @@ void load_firmware(void){
     
     int result = br_rsa_i15_pkcs1_vrfy(
         rsa_signature, // const unsigned char *x - (signature buffer)
-        sizeof(rsa_signature), // size_t xlen - (signature length in bytes)
+        256, // size_t xlen - (signature length in bytes)
         BR_HASH_OID_SHA256, // const unsigned char *hash_oid - (OID of hash)
-        sizeof(fw_hash), // expected hash value length - (in bytes).
+        32, // expected hash value length - (in bytes).
         &pub_key, // const br_rsa_public_key *pk - RSA public key.
         fw_hash // unsigned char *hash_out - output buffer for the hash value
     );
-
-    /*
 
     if (result == 0){
         reject();
         return;
     }
-    */
 
     uint32_data[6] = uint32_data[4] + uint32_data[5];
     int_data[3] = 0;
