@@ -179,140 +179,150 @@ void reject() {
  * Load the firmware into flash.
  */
 void load_firmware(void){
-    int read = 0;
-    uint32_t rcv = 0;
+    /* INT MEMORY ADDRESSES */
+    int* int_data = (int*) 0x20002000;
+    // int_data[0] == int read
 
-    uint32_t data_index = 0;
-    uint32_t page_addr = FW_BASE;
-    uint32_t version = 0;
-    uint32_t fw_size = 0;
-    uint32_t rm_size = 0; // size of release message
-    uint32_t buffer_length = 0; // length of buffer
-    uint8_t rsa_signature[256];
-    uint8_t iv[16];
-    char hmac_tag[32];
-    uint8_t msg_type = 5; // type of message
-    unsigned char* data = (unsigned char*) 0x20002000;
+    /* UINT32_T MEMORY ADDRESSES */
+    uint32_t* uint32_data = (uint32_t*) 0x20003000;
+    // uint32_data[0] == uint32_t rcv
+    // uint32_data[1] == uint32_t data_index
+    // uint32_data[2] == uint32_t page_addr
+    // uint32_data[3] == uint32_t version
+    // uint32_data[4] == uint32_t fw_size
+    // uint32_data[5] == uint32_t rm_size
+    // uint32_data[6] == uint32_t buffer_length
+
+    uint32_data[2] = FW_BASE;
+
+    /* UINT8_T MEMORY ADDRESSES */
+    uint8_t* uint8_data = (uint8_t*) 0x20004000;
+    // uint8_data[0] == uint8_t msg_type
+    uint8_data[0] = 5;
+
+    /* UINT16_T MEMORY ADDRESSES */
+    uint16_t** uint16p_data = (uint16_t**) 0x20004600;
+    // uint16p_data[0] = uint16_t* fw_ver_ad
+    uint16p_data[0] = (uint16_t*) fw_version_address;
+
+    uint16_t* uint16_data = (uint16_t*) 0x20004500;
+    // uint16_data[0] = uint16_t old_versoin
+    uint16_data[0] = *(uint16p_data[0]);
+    
+
+    // 0x20001000 + 256 bytes -> 0x200010FF
+    uint8_t* rsa_signature = (uint8_t*) 0x20005000;
+    // 0x20001100 + 16 bytes -> 0x2000110F
+    uint8_t* iv = (uint8_t*) 0x20005100; 
+    // 0x20001110 + 32 bytes -> 0x2000112F
+    char* hmac_tag = (char*) 0x20005110;
+    // 0x20001130 + 32 bytes -> 0x2000114F
+    uint8_t* new_tag = (uint8_t*) 0x20005130;
+    // 0x20001150 + 32 bytes -> 0x2000116F
+    unsigned char* fw_hash = (unsigned char*) 0x20005150;
+
+    // 0x20001170 + 22 bytes -> 0x20001185
+    uint8_t* meta_IV = (uint8_t*) 0x20005170; // the data used to generate the HMAC tag
+
+    // 0x20001186 -> 0x20001585
+    unsigned char* data = (unsigned char*) 0x20005186;
+    // 0x20001586 + 30kb -> somewhere
+    uint8_t* fw_buffer = (uint8_t*) 0x20005586;
 
     /* GET MSG TYPE (0x1 bytes)*/
-    rcv = uart_read(UART1, BLOCKING, &read);
-    msg_type = (uint8_t) rcv;
+    uint32_data[0] = uart_read(UART1, BLOCKING, &int_data[0]);
+    uint8_data[0] = (uint8_t) uint32_data[0];
 
     uart_write_str(UART2, "Received Message Type: ");
-    uart_write_hex(UART2, version);
+    uart_write_hex(UART2, uint32_data[3]);
     nl(UART2);
 
     /* CHECK IF MSG TYPE IS 0 */
-    if (msg_type != METADATA_CODE) {
+    if (uint8_data[0] != METADATA_CODE) {
         reject();
         return;
     }
 
      /* GET FW_SIZE (0x2 bytes) */
-    rcv = uart_read(UART1, BLOCKING, &read);
-    fw_size = (uint32_t)rcv;
-    rcv = uart_read(UART1, BLOCKING, &read);
-    fw_size |= (uint32_t)rcv << 8;
+    uint32_data[0] = uart_read(UART1, BLOCKING, int_data);
+    uint32_data[4] = (uint32_t)uint32_data[0];
+    uint32_data[0] = uart_read(UART1, BLOCKING, int_data);
+    uint32_data[4] |= (uint32_t)uint32_data[0] << 8;
 
     uart_write_str(UART2, "Received Firmware Size: ");
-    uart_write_hex(UART2, fw_size);
+    uart_write_hex(UART2, uint32_data[4]);
     nl(UART2);
 
     // Get version as (0x2) bytes 
-    rcv = uart_read(UART1, BLOCKING, &read);
-    version = (uint32_t)rcv;
-    rcv = uart_read(UART1, BLOCKING, &read);
-    version |= (uint32_t)rcv << 8;
+    uint32_data[0] = uart_read(UART1, BLOCKING, int_data);
+    uint32_data[3] = (uint32_t)uint32_data[0];
+    uint32_data[0] = uart_read(UART1, BLOCKING, int_data);
+    uint32_data[3] |= (uint32_t)uint32_data[0] << 8;
 
     uart_write_str(UART2, "Received Firmware Version: ");
-    uart_write_hex(UART2, version);
+    uart_write_hex(UART2, uint32_data[3]);
     nl(UART2);
 
     /* GET RELEASE_MESSAGE_SIZE (0x2 bytes) */
-    rcv = uart_read(UART1, BLOCKING, &read);
-    rm_size = (uint32_t)rcv;
-    rcv = uart_read(UART1, BLOCKING, &read);
-    rm_size |= (uint32_t)rcv << 8;
+    uint32_data[0] = uart_read(UART1, BLOCKING, int_data);
+    uint32_data[5] = (uint32_t)uint32_data[0];
+    uint32_data[0] = uart_read(UART1, BLOCKING, int_data);
+    uint32_data[5] |= (uint32_t)uint32_data[0] << 8;
 
     // Compare to old version and abort if older (note special case for version 0).
-    uint16_t* fw_ver_ad = (uint16_t*) fw_version_address;
-    uint16_t old_version = *(fw_ver_ad);
-
-    if (version != 0 && version < old_version){
+    if (uint32_data[3] != 0 && uint32_data[3] < uint16_data[0]){
         reject();
         return;
     }
 
     int debug = 0;
-    if (version == 0){
+    if (uint32_data[3] == 0){
         // If debug firmware, don't change version
-        version = old_version;
+        uint32_data[3] = uint16_data[0];
         debug = 1;
     }
 
     // Write new firmware size and version to Flash
     // Create 32 bit word for flash programming, version is at lower address, size is at higher address
-    uint32_t metadata = ((fw_size & 0xFFFF) << 16) | (version & 0xFFFF);
+    uint32_t metadata = ((uint32_data[4] & 0xFFFF) << 16) | (uint32_data[3] & 0xFFFF);
     program_flash(METADATA_BASE, (uint8_t *)(&metadata), 4);
 
     if (debug) {
-        version = 0; // set version back to 0 after writing
+        uint32_data[3] = 0; // set version back to 0 after writing
     }
 
     uart_write(UART1, OK); // Acknowledge the metadata.
     
-    buffer_length = rm_size + fw_size;
-    // account for padding
-    int remaining = buffer_length % 16;
-    buffer_length += 16 - remaining;
+    uint32_data[6] = (uint32_data[5] + uint32_data[4]) + (16 - ((uint32_data[5] + uint32_data[4]) % 16));
 
     /* GET IV (0x10 bytes) */
     for (int i = 0; i < 16; i++) {
-        rcv = uart_read(UART1, BLOCKING, &read);
-        iv[i] = (uint8_t) rcv;
+        uint32_data[0] = uart_read(UART1, BLOCKING, int_data);
+        iv[i] = (uint8_t) uint32_data[0];
     }
 
     /* GET HMAC TAG (0x20 bytes) */
     for (int i = 0; i < 32; i++) {
-        rcv = uart_read(UART1, BLOCKING, &read);
-        hmac_tag[i] = (char) rcv;
+        uint32_data[0] = uart_read(UART1, BLOCKING, int_data);
+        hmac_tag[i] = (char) uint32_data[0];
     }
 
-    int meta_IV_len = 2 + 2 + 2 + 16;
-    uint8_t meta_IV[meta_IV_len]; // the data used to generate the HMAC tag
-    int meta_IV_index = 0;
-
     /* add shorts */
-    uint8_t byte1 = (uint8_t) (fw_size); // fw_size
-    uint8_t byte2 = (uint8_t) (fw_size >> 8);
-    meta_IV[meta_IV_index] = byte1;
-    meta_IV_index++;
-    meta_IV[meta_IV_index] = byte2;
-    meta_IV_index++;
-
-    byte1 = (uint8_t) (version); // fw_version
-    byte2 = (uint8_t) (version >> 8);
-    meta_IV[meta_IV_index] = byte1;
-    meta_IV_index++;
-    meta_IV[meta_IV_index] = byte2;
-    meta_IV_index++;
-
-    byte1 = (uint8_t) (rm_size); // rm_size
-    byte2 = (uint8_t) (rm_size >> 8);
-    meta_IV[meta_IV_index] = byte1;
-    meta_IV_index++;
-    meta_IV[meta_IV_index] = byte2;
-    meta_IV_index++;
+    meta_IV[0] = (uint8_t) (uint32_data[4]); // fw_size
+    meta_IV[1] = (uint8_t) (uint32_data[4] >> 8);
+    meta_IV[2] = (uint8_t) (uint32_data[3]);
+    meta_IV[3] = (uint8_t) (uint32_data[3] >> 8);
+    meta_IV[4] = (uint8_t) (uint32_data[5]);
+    meta_IV[5] = (uint8_t) (uint32_data[5] >> 8);
 
     /* ADD TAGS */
     for (int i = 0; i < 16; ++i) {
-        meta_IV[meta_IV_index] = iv[i];
-        meta_IV_index++;
+        meta_IV[6+i] = iv[i];
     }
 
     //Create array for new hmac_tag based on data
-    uint8_t new_tag[32];
-    sha_hmac((char*) hmacKey, 32, (char*) meta_IV, meta_IV_len, (char*) new_tag);
+    
+    sha_hmac((char*) hmacKey, 32, (char*) meta_IV, 22, (char*) new_tag);
     
     //Verify the new tag with the old tag
     int same = 1;
@@ -329,32 +339,32 @@ void load_firmware(void){
     }
 
     // manually set address of fw_buffer as not doing it manually overwrites the pointer to the pointer of the metadata
-    uint8_t* fw_buffer = (uint8_t*) 0x20005000;
+    
     int fw_buffer_index = 0;
 
     /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
     while (1) {
         /* WAIT FOR MESSAGE TYPE 1 */
-        rcv = uart_read(UART1, BLOCKING, &read);
-        msg_type = (uint8_t) rcv;
+        uint32_data[0] = uart_read(UART1, BLOCKING, int_data);
+        uint8_data[0] = (uint8_t) uint32_data[0];
 
         uart_write_str(UART2, "Received Message Type: ");
-        uart_write_hex(UART2, msg_type);
+        uart_write_hex(UART2, uint8_data[0]);
         nl(UART2);
         
-        if (msg_type != MESSAGE_CODE) {
+        if (uint8_data[0] != MESSAGE_CODE) {
             
-            if (msg_type == SIGNATURE_CODE) break;
+            if (uint8_data[0] == SIGNATURE_CODE) break;
 
             reject();
             return;
         }
 
         for (int i = 0; i < FRAME_SIZE; ++i) {
-            rcv = uart_read(UART1, BLOCKING, &read);
+            uint32_data[0] = uart_read(UART1, BLOCKING, int_data);
             
-            if (fw_buffer_index < buffer_length) {
-                fw_buffer[fw_buffer_index] = (uint8_t) rcv;
+            if (fw_buffer_index < uint32_data[6]) {
+                fw_buffer[fw_buffer_index] = (uint8_t) uint32_data[0];
                 fw_buffer_index += 1;
             }
         }
@@ -364,23 +374,22 @@ void load_firmware(void){
 
     /* MESSAGE TYPE 2 (RSA SIG) ALREADY READ */
     uart_write_str(UART2, "Received Message Type: ");
-    uart_write_hex(UART2, msg_type);
+    uart_write_hex(UART2, uint8_data[0]);
     nl(UART2);
 
     /* READ 256 BYTES RSA SIGNATURE */
     for (int i = 0; i < 256; i++) {
-        rcv = uart_read(UART1, BLOCKING, &read);
-        rsa_signature[i] = (uint8_t)rcv;
+        uint32_data[0] = uart_read(UART1, BLOCKING, int_data);
+        rsa_signature[i] = (uint8_t)uint32_data[0];
     }
     uart_write_str(UART2, "Received RSA Signature: ");
     nl(UART2);
     uart_write(UART1, OK);
 
     // decrypt
-    aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, buffer_length);
+    aes_decrypt((char*) aesKey, (char*) iv, (char*) fw_buffer, uint32_data[6]);
 
-    unsigned char fw_hash[32];
-    sha_hash((unsigned char*) fw_buffer, fw_size, fw_hash);
+    sha_hash((unsigned char*) fw_buffer, uint32_data[4], fw_hash);
 
     br_rsa_public_key pub_key;
     pub_key.n = rsaModulus;
@@ -397,43 +406,46 @@ void load_firmware(void){
         fw_hash // unsigned char *hash_out - output buffer for the hash value
     );
 
+    /*
+
     if (result == 0){
         reject();
         return;
     }
+    */
 
-    buffer_length = fw_size + rm_size;
+    uint32_data[6] = uint32_data[4] + uint32_data[5];
     fw_buffer_index = 0;
 
     uint8_t completed = 0; // set to 1 if read all bytes from buffer
 
     while (1){
         for (int i = 0; i < FLASH_PAGESIZE; ++i){
-            if (fw_buffer_index >= buffer_length) {
+            if (fw_buffer_index >= uint32_data[6]) {
                 completed = 1;
                 break;
             }
 
-            data[data_index] = fw_buffer[fw_buffer_index];
+            data[uint32_data[1]] = fw_buffer[fw_buffer_index];
             fw_buffer_index += 1;
-            data_index += 1;
+            uint32_data[1] += 1;
         } // for
 
         // If we filed our page buffer, program it
-        if (data_index == FLASH_PAGESIZE || completed == 1){
+        if (uint32_data[1] == FLASH_PAGESIZE || completed == 1){
 
             if(completed == 1){
                 uart_write_str(UART2, "Finished reading data from buffer\n");
             }
             
             // Try to write flash and check for error
-            if (program_flash(page_addr, data, data_index)){
+            if (program_flash(uint32_data[2], data, uint32_data[1])){
                 reject();
                 return;
             }
 
             // Verify flash program
-            if (memcmp(data, (void *) page_addr, data_index) != 0){
+            if (memcmp(data, (void *) uint32_data[2], uint32_data[1]) != 0){
                 uart_write_str(UART2, "Flash check failed.\n");
                 uart_write(UART1, FAILED_WRITE);
                 SysCtlReset(); // Reset device
@@ -442,14 +454,14 @@ void load_firmware(void){
 
             // Write debugging messages to UART2.
             uart_write_str(UART2, "Page successfully programmed\nAddress: ");
-            uart_write_hex(UART2, page_addr);
+            uart_write_hex(UART2, uint32_data[2]);
             uart_write_str(UART2, "\nBytes: ");
-            uart_write_hex(UART2, data_index);
+            uart_write_hex(UART2, uint32_data[1]);
             nl(UART2);
 
             // Update to next page
-            page_addr += FLASH_PAGESIZE;
-            data_index = 0;
+            uint32_data[2] += FLASH_PAGESIZE;
+            uint32_data[1] = 0;
 
             // If at end of firmware, go to main
             if (completed == 1){
