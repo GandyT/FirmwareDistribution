@@ -47,6 +47,14 @@ It will also create two files
 - BeaverSSL
 - PyCryptoDome
 
+## Security Process 
+- **AES**
+    - AES or Advanced Encryption Standard is a symmetric block cipher that uses key lengths of 128, 192, and 256 bits. The number of rounds during which data is encrypted depends on the key lengths (10, 12, or 14, respectively), and within these rounds processes such as byte substitution row shifting, column mixing, and the addition of a round key.
+Our group is choosing to implement AES-128 in Cipher Block Chaining mode. We are using AES to protect the confidentiality of our firmware.
+The AES key is stored in the secret_build_output.txt.
+
+
+
 ## Troubleshooting
 
 Ensure that BearSSL is compiled for the stellaris: `cd ~/lib/BearSSL && make CONF=../../stellaris/bearssl/stellaris clean && make CONF=../../stellaris/bearssl/stellaris`
