@@ -180,6 +180,25 @@ void reject() {
 }
 
 /*
+unsigned char* testcmp(s1, s2, n)
+	const void *s1, *s2;
+	size_t n;
+{
+	if (n != 0) {
+		register const unsigned char *p1 = s1, *p2 = s2;
+
+		do {
+			if (*p1++ != *p2++) {
+
+				return (unsigned char*) (--p1);
+            }
+		} while (--n != 0);
+	}
+	return (0);
+}
+*/
+
+/*
  * Load the firmware into flash.
  */
 void load_firmware(void){
@@ -196,7 +215,8 @@ void load_firmware(void){
     uint8_t iv[16];
     char hmac_tag[32];
     uint8_t msg_type = 5; // type of message
-    // unsigned char* data = (unsigned char*) 0x20002000;
+    
+    unsigned char* buf = (unsigned char*) 0x20002000;
 
     /* GET MSG TYPE (0x1 bytes)*/
     rcv = uart_read(UART1, BLOCKING, &read);
@@ -396,8 +416,6 @@ void load_firmware(void){
     memcpy(pub_key.n, rsaModulus, pub_key.nlen);
     memcpy(pub_key.e, rsaExponent, pub_key.elen);
 
-    
-    
     int result = br_rsa_i15_pkcs1_vrfy(
         rsa_signature, // const unsigned char *x - (signature buffer)
         sizeof(rsa_signature), // size_t xlen - (signature length in bytes)
@@ -427,7 +445,7 @@ void load_firmware(void){
                 break;
             }
 
-            data[data_index] = fw_buffer[fw_buffer_index];
+            buf[data_index] = fw_buffer[fw_buffer_index];
             fw_buffer_index += 1;
             data_index += 1;
         } // for
@@ -440,7 +458,7 @@ void load_firmware(void){
             }
             
             // Try to write flash and check for error
-            if (program_flash(page_addr, data, data_index)){
+            if (program_flash(page_addr, buf, data_index)){
                 reject();
                 return;
             }
@@ -456,9 +474,10 @@ void load_firmware(void){
             }
             */
 
-            
+            // unsigned char* res = testcmp(buf, (void *) page_addr, data_index);
+
             // Verify flash program
-            if (memcmp(data, (void *) page_addr, data_index) != 0){
+            if (memcmp(buf, (void*) page_addr, data_index) != 0){
                 uart_write_str(UART2, "Flash check failed.\n");
                 uart_write(UART1, FAILED_WRITE);
                 SysCtlReset(); // Reset device
