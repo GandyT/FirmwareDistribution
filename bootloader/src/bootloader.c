@@ -182,6 +182,9 @@ void load_firmware(void){
     /* INT MEMORY ADDRESSES */
     int* int_data = (int*) 0x20002000;
     // int_data[0] == int read
+    // int_data[1] == int debug
+    // int_data[2] == int same
+    // int_data[3] == int fw_buffer_index
 
     /* UINT32_T MEMORY ADDRESSES */
     uint32_t* uint32_data = (uint32_t*) 0x20003000;
@@ -192,6 +195,7 @@ void load_firmware(void){
     // uint32_data[4] == uint32_t fw_size
     // uint32_data[5] == uint32_t rm_size
     // uint32_data[6] == uint32_t buffer_length
+    // uint32_data[7] == uint32_t metadata
 
     uint32_data[2] = FW_BASE;
 
@@ -275,19 +279,19 @@ void load_firmware(void){
         return;
     }
 
-    int debug = 0;
+    int_data[1]  = 0;
     if (uint32_data[3] == 0){
         // If debug firmware, don't change version
         uint32_data[3] = uint16_data[0];
-        debug = 1;
+        int_data[1] = 1;
     }
 
     // Write new firmware size and version to Flash
     // Create 32 bit word for flash programming, version is at lower address, size is at higher address
-    uint32_t metadata = ((uint32_data[4] & 0xFFFF) << 16) | (uint32_data[3] & 0xFFFF);
-    program_flash(METADATA_BASE, (uint8_t *)(&metadata), 4);
+    uint32_data[7] = ((uint32_data[4] & 0xFFFF) << 16) | (uint32_data[3] & 0xFFFF);
+    program_flash(METADATA_BASE, (uint8_t *)(&uint32_data[7]), 4);
 
-    if (debug) {
+    if (int_data[1]) {
         uint32_data[3] = 0; // set version back to 0 after writing
     }
 
@@ -325,22 +329,22 @@ void load_firmware(void){
     sha_hmac((char*) hmacKey, 32, (char*) meta_IV, 22, (char*) new_tag);
     
     //Verify the new tag with the old tag
-    int same = 1;
+    int_data[2] = 1;
     for (int i = 0; i < 32; i++){
         if(new_tag[i] != hmac_tag[i]){
-            same = 0;
+            int_data[2] = 0;
             break;
         }
     }
 
-    if (same == 0){
+    if (int_data[2] == 0){
         reject();
         return;
     }
 
     // manually set address of fw_buffer as not doing it manually overwrites the pointer to the pointer of the metadata
     
-    int fw_buffer_index = 0;
+    int_data[3] = 0;
 
     /* KEEP READING CHUNKS OF 256 BYTES + SEND OK */
     while (1) {
@@ -363,9 +367,9 @@ void load_firmware(void){
         for (int i = 0; i < FRAME_SIZE; ++i) {
             uint32_data[0] = uart_read(UART1, BLOCKING, int_data);
             
-            if (fw_buffer_index < uint32_data[6]) {
-                fw_buffer[fw_buffer_index] = (uint8_t) uint32_data[0];
-                fw_buffer_index += 1;
+            if (int_data[3] < uint32_data[6]) {
+                fw_buffer[int_data[3]] = (uint8_t) uint32_data[0];
+                int_data[3] += 1;
             }
         }
 
@@ -415,19 +419,19 @@ void load_firmware(void){
     */
 
     uint32_data[6] = uint32_data[4] + uint32_data[5];
-    fw_buffer_index = 0;
+    int_data[3] = 0;
 
     uint8_t completed = 0; // set to 1 if read all bytes from buffer
 
     while (1){
         for (int i = 0; i < FLASH_PAGESIZE; ++i){
-            if (fw_buffer_index >= uint32_data[6]) {
+            if (int_data[3] >= uint32_data[6]) {
                 completed = 1;
                 break;
             }
 
-            data[uint32_data[1]] = fw_buffer[fw_buffer_index];
-            fw_buffer_index += 1;
+            data[uint32_data[1]] = fw_buffer[int_data[3]];
+            int_data[3] += 1;
             uint32_data[1] += 1;
         } // for
 
