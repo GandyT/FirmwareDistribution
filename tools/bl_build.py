@@ -116,5 +116,5 @@ if __name__ == "__main__":
     make_bootloader()
 
     # delete header file
-    # os.remove(HEADER_FILE)
+    os.remove(HEADER_FILE)
     
